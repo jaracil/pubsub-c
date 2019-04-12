@@ -13,7 +13,7 @@ typedef struct subscriber_list_s {
 	struct subscriber_list_s *prev;
 } subscriber_list_t;
 
-typedef struct {
+typedef struct topic_map_s {
 	char *topic;
 	subscriber_list_t *subscribers;
 	ps_msg_t *sticky;

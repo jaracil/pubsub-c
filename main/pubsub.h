@@ -29,18 +29,18 @@ enum msg_flags {
 
 typedef void (*ps_dtor_t)(void *);
 
-typedef struct {
+typedef struct ps_buf_s {
 	void *ptr;
 	size_t sz;
 	ps_dtor_t dtor;
 } ps_buf_t;
 
-typedef struct {
+typedef struct ps_err_s {
 	int id;
 	char *desc;
 } ps_err_t;
 
-typedef struct {
+typedef struct ps_msg_s {
 	uint32_t _ref; // Ref counter
 	char *topic;   // Message topic
 	char *rtopic;  // Response topic
