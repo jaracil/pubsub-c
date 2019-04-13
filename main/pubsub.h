@@ -22,8 +22,10 @@ enum msg_flags {
 	MSK_TYP = 0x00000F00u,
 };
 
+typedef const char *strlist_t[];
+
 #define STRLIST(...)                                                                                                   \
-	(const char *[]) {                                                                                                 \
+	(strlist_t) {                                                                                                      \
 		__VA_ARGS__, NULL                                                                                              \
 	}
 
@@ -64,12 +66,12 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
 ps_msg_t *ps_ref_msg(ps_msg_t *msg);
 void ps_unref_msg(ps_msg_t *msg);
 
-ps_subscriber_t *ps_new_subscriber(size_t queue_size, const char *subs[]);
+ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
 void ps_free_subscriber(ps_subscriber_t *s);
 
 ps_msg_t *ps_get(ps_subscriber_t *su, int tout);
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
-int ps_subscribe_many(ps_subscriber_t *su, const char *subs[]);
+int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs);
 int ps_unsubscribe(ps_subscriber_t *su, const char *topic);
 size_t ps_unsubscribe_all(ps_subscriber_t *su);
 size_t ps_flush(ps_subscriber_t *su);

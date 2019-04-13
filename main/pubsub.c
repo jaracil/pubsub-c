@@ -108,7 +108,7 @@ size_t ps_stats_live_msg(void) {
 	return __sync_fetch_and_add(&stat_live_msg, 0);
 }
 
-ps_subscriber_t *ps_new_subscriber(size_t queue_size, const char *subs[]) {
+ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs) {
 	ps_subscriber_t *su = calloc(1, sizeof(ps_subscriber_t));
 	su->q = xQueueCreate(queue_size, sizeof(ps_msg_t *));
 	su->overflow = false;
@@ -139,7 +139,7 @@ size_t ps_flush(ps_subscriber_t *su) {
 	return flushed;
 }
 
-int ps_subscribe_many(ps_subscriber_t *su, const char *subs[]) {
+int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs) {
 	int n = 0;
 	if (subs != NULL) {
 		size_t idx = 0;
