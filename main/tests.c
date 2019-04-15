@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
@@ -131,4 +132,9 @@ void app_main() {
 	test_overflow();
 
 	printf("All tests passed!\n");
+}
+
+int main(void) {
+	app_main();
+	return 0;
 }

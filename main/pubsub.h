@@ -4,9 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
+//#define PS_USE_GETTIMEOFDAY  //Use gettimeofday instead clock_gettime
 
 enum msg_flags {
 	FL_STICKY = 1 << 0,
@@ -69,7 +67,7 @@ void ps_unref_msg(ps_msg_t *msg);
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
 void ps_free_subscriber(ps_subscriber_t *s);
 
-ps_msg_t *ps_get(ps_subscriber_t *su, int tout);
+ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout);
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
 int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs);
 int ps_unsubscribe(ps_subscriber_t *su, const char *topic);

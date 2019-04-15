@@ -1,11 +1,22 @@
 #include <stdarg.h>
 #include <pthread.h>
+#include <time.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include "pubsub.h"
 #include "uthash.h"
 #include "utlist.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
+
+typedef struct ps_queue_s {
+	ps_msg_t **messages;
+	size_t size;
+	size_t count;
+	size_t head;
+	size_t tail;
+	pthread_mutex_t mux;
+	pthread_cond_t not_empty;
+} ps_queue_t;
 
 typedef struct subscriber_list_s {
 	ps_subscriber_t *su;
@@ -27,7 +38,7 @@ typedef struct subscriptions_list_s {
 } subscriptions_list_t;
 
 struct ps_subscriber_s {
-	QueueHandle_t q;
+	ps_queue_t *q;
 	subscriptions_list_t *subs;
 	uint32_t overflow;
 };
@@ -40,6 +51,108 @@ static uint32_t stat_live_subscribers;
 
 void ps_init(void) {
 	pthread_mutex_init(&lock, NULL);
+}
+
+static int deadline_ms(int64_t ms, struct timespec *tout) {
+
+#ifdef PS_USE_GETTIMEOFDAY
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	tout->tv_sec = tv.tv_sec;
+	tout->tv_nsec = tv.tv_usec * 1000;
+#else
+	clock_gettime(CLOCK_MONOTONIC, tout);
+#endif
+	tout->tv_sec += (ms / 1000);
+	tout->tv_nsec += ((ms % 1000) * 1000000);
+	if (tout->tv_nsec > 1000000000) {
+		tout->tv_sec++;
+		tout->tv_nsec -= 1000000000;
+	}
+	return 0;
+}
+
+ps_queue_t *ps_new_queue(size_t sz) {
+
+	ps_queue_t *q = calloc(1, sizeof(ps_queue_t));
+	q->size = sz;
+	q->messages = calloc(sz, sizeof(void *));
+	pthread_mutex_init(&q->mux, NULL);
+
+#ifdef PS_USE_GETTIMEOFDAY
+	pthread_cond_init(&q->not_empty, NULL);
+#else
+	pthread_condattr_t cond_attr;
+	pthread_condattr_init(&cond_attr);
+	pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+	pthread_cond_init(&q->not_empty, &cond_attr);
+	pthread_condattr_destroy(&cond_attr);
+#endif
+	return q;
+}
+
+void ps_free_queue(ps_queue_t *q) {
+	free(q->messages);
+	pthread_mutex_destroy(&q->mux);
+	pthread_cond_destroy(&q->not_empty);
+	free(q);
+}
+
+int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
+	int ret = 0;
+
+	pthread_mutex_lock(&q->mux);
+	if (q->count >= q->size) {
+		ret = -1;
+		goto exit_fn;
+	}
+	q->messages[q->head] = msg;
+	if (++q->head >= q->size)
+		q->head = 0;
+	q->count++;
+	pthread_cond_signal(&q->not_empty);
+
+exit_fn:
+	pthread_mutex_unlock(&q->mux);
+	return ret;
+}
+
+ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
+	ps_msg_t *msg = NULL;
+	struct timespec tout = {0};
+	bool init_tout = false;
+
+	pthread_mutex_lock(&q->mux);
+	while (q->count == 0) {
+		if (timeout == 0) {
+			goto exit_fn;
+		} else if (timeout < 0) {
+			pthread_cond_wait(&q->not_empty, &q->mux);
+		} else {
+			if (!init_tout) {
+				init_tout = true;
+				deadline_ms(timeout, &tout);
+			}
+			if (pthread_cond_timedwait(&q->not_empty, &q->mux, &tout) != 0)
+				goto exit_fn;
+		}
+	}
+	msg = q->messages[q->tail];
+	if (++q->tail >= q->size)
+		q->tail = 0;
+	q->count--;
+
+exit_fn:
+	pthread_mutex_unlock(&q->mux);
+	return msg;
+}
+
+size_t ps_queue_waiting(ps_queue_t *q) {
+	size_t res = 0;
+	pthread_mutex_lock(&q->mux);
+	res = q->count;
+	pthread_mutex_unlock(&q->mux);
+	return res;
 }
 
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
@@ -109,7 +222,7 @@ size_t ps_stats_live_msg(void) {
 
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs) {
 	ps_subscriber_t *su = calloc(1, sizeof(ps_subscriber_t));
-	su->q = xQueueCreate(queue_size, sizeof(ps_msg_t *));
+	su->q = ps_new_queue(queue_size);
 	su->overflow = false;
 	ps_subscribe_many(su, subs);
 	__sync_add_and_fetch(&stat_live_subscribers, 1);
@@ -119,7 +232,7 @@ ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs) {
 void ps_free_subscriber(ps_subscriber_t *su) {
 	ps_unsubscribe_all(su);
 	ps_flush(su);
-	vQueueDelete(su->q);
+	ps_free_queue(su->q);
 	free(su);
 	__sync_sub_and_fetch(&stat_live_subscribers, 1);
 }
@@ -131,7 +244,7 @@ size_t ps_stats_live_subscribers(void) {
 size_t ps_flush(ps_subscriber_t *su) {
 	size_t flushed = 0;
 	ps_msg_t *msg = NULL;
-	while (xQueueReceive(su->q, &msg, 0) == pdTRUE) {
+	while ((msg = ps_queue_pull(su->q, 0)) != NULL) {
 		ps_unref_msg(msg);
 		flushed++;
 	}
@@ -176,7 +289,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic) {
 	DL_APPEND(su->subs, subs);
 	if (tm->sticky != NULL) {
 		ps_ref_msg(tm->sticky);
-		if (xQueueSend(su->q, &tm->sticky, 0) != pdTRUE) {
+		if (ps_queue_push(su->q, tm->sticky) != 0) {
 			__sync_add_and_fetch(&su->overflow, 1);
 			ps_unref_msg(tm->sticky);
 		}
@@ -250,12 +363,8 @@ size_t ps_unsubscribe_all(ps_subscriber_t *su) {
 	return count;
 }
 
-ps_msg_t *ps_get(ps_subscriber_t *su, int tout) {
-	ps_msg_t *msg = NULL;
-	if (tout < 0)
-		tout = portMAX_DELAY;
-	xQueueReceive(su->q, &msg, tout);
-	return msg;
+ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout) {
+	return ps_queue_pull(su->q, timeout);
 }
 
 size_t ps_num_subs(ps_subscriber_t *su) {
@@ -266,7 +375,7 @@ size_t ps_num_subs(ps_subscriber_t *su) {
 }
 
 size_t ps_waiting(ps_subscriber_t *su) {
-	return uxQueueMessagesWaiting(su->q);
+	return ps_queue_waiting(su->q);
 }
 
 size_t ps_overflow(ps_subscriber_t *su) {
@@ -311,7 +420,7 @@ size_t ps_publish(ps_msg_t *msg) {
 		if (tm != NULL) {
 			DL_FOREACH (tm->subscribers, sl) {
 				ps_ref_msg(msg);
-				if (xQueueSend(sl->su->q, &msg, 0) != pdTRUE) {
+				if (ps_queue_push(sl->su->q, msg) != 0) {
 					__sync_add_and_fetch(&sl->su->overflow, 1);
 					ps_unref_msg(msg);
 				}
