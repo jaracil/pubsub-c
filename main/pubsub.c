@@ -1,11 +1,11 @@
 #include <stdarg.h>
+#include <pthread.h>
 
 #include "pubsub.h"
 #include "uthash.h"
 #include "utlist.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
-#include "freertos/semphr.h"
 
 typedef struct subscriber_list_s {
 	ps_subscriber_t *su;
@@ -32,15 +32,14 @@ struct ps_subscriber_s {
 	uint32_t overflow;
 };
 
-static SemaphoreHandle_t sem;
+static pthread_mutex_t lock;
 static topic_map_t *topic_map = NULL;
 
 static uint32_t stat_live_msg;
 static uint32_t stat_live_subscribers;
 
 void ps_init(void) {
-	sem = xSemaphoreCreateMutex();
-	xSemaphoreGive(sem);
+	pthread_mutex_init(&lock, NULL);
 }
 
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
@@ -157,8 +156,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic) {
 	subscriber_list_t *sl;
 	subscriptions_list_t *subs;
 
-	while (!xSemaphoreTake(sem, portMAX_DELAY))
-		;
+	pthread_mutex_lock(&lock);
 	HASH_FIND_STR(topic_map, topic, tm);
 	if (tm == NULL) {
 		tm = calloc(1, sizeof(*tm));
@@ -185,7 +183,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic) {
 	}
 
 exit_fn:
-	xSemaphoreGive(sem);
+	pthread_mutex_unlock(&lock);
 	return ret;
 }
 
@@ -195,8 +193,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 	subscriber_list_t *sl;
 	subscriptions_list_t *subs;
 
-	while (!xSemaphoreTake(sem, portMAX_DELAY))
-		;
+	pthread_mutex_lock(&lock);
 	HASH_FIND_STR(topic_map, topic, tm);
 	if (tm == NULL) {
 		ret = -1;
@@ -221,7 +218,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 	}
 
 exit_fn:
-	xSemaphoreGive(sem);
+	pthread_mutex_unlock(&lock);
 	return ret;
 }
 
@@ -230,8 +227,7 @@ size_t ps_unsubscribe_all(ps_subscriber_t *su) {
 	subscriber_list_t *sl;
 	size_t count = 0;
 
-	while (!xSemaphoreTake(sem, portMAX_DELAY))
-		;
+	pthread_mutex_lock(&lock);
 	s = su->subs;
 	while (s != NULL) {
 		DL_SEARCH_SCALAR(s->tm->subscribers, sl, su, su);
@@ -250,7 +246,7 @@ size_t ps_unsubscribe_all(ps_subscriber_t *su) {
 		count++;
 	}
 	su->subs = NULL;
-	xSemaphoreGive(sem);
+	pthread_mutex_unlock(&lock);
 	return count;
 }
 
@@ -282,15 +278,14 @@ size_t ps_overflow(ps_subscriber_t *su) {
 void ps_clean_sticky(void) {
 	topic_map_t *tm, *tm_tmp;
 
-	while (!xSemaphoreTake(sem, portMAX_DELAY))
-		;
+	pthread_mutex_lock(&lock);
 	HASH_ITER(hh, topic_map, tm, tm_tmp) {
 		if (tm->sticky != NULL) {
 			ps_unref_msg(tm->sticky);
 			tm->sticky = NULL;
 		}
 	}
-	xSemaphoreGive(sem);
+	pthread_mutex_unlock(&lock);
 }
 
 size_t ps_publish(ps_msg_t *msg) {
@@ -298,8 +293,7 @@ size_t ps_publish(ps_msg_t *msg) {
 	subscriber_list_t *sl;
 	size_t ret = 0;
 	char *topic = strdup(msg->topic);
-	while (!xSemaphoreTake(sem, portMAX_DELAY))
-		;
+	pthread_mutex_lock(&lock);
 	if (msg->flags & FL_STICKY) {
 		HASH_FIND_STR(topic_map, topic, tm);
 		if (tm == NULL) {
@@ -336,6 +330,6 @@ size_t ps_publish(ps_msg_t *msg) {
 	}
 	ps_unref_msg(msg);
 	free(topic);
-	xSemaphoreGive(sem);
+	pthread_mutex_unlock(&lock);
 	return ret;
 }
