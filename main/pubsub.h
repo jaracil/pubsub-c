@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-//#define PS_USE_GETTIMEOFDAY  //Use gettimeofday instead clock_gettime
+#define PS_USE_GETTIMEOFDAY // Use gettimeofday instead of monotonic clock_gettime
 
 enum msg_flags {
 	FL_STICKY = 1 << 0,

@@ -93,7 +93,7 @@ void test_pub_get(void) {
 	assert(IS_BUF(msg) && (msg->buf_val.sz == 10));
 	ps_unref_msg(msg);
 
-	msg = ps_get(s1, 0);
+	msg = ps_get(s1, 1);
 	assert(msg == NULL);
 
 	assert(ps_waiting(s1) == 0);
