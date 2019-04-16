@@ -12,11 +12,11 @@ void check_leak(void) {
 
 void test_subscriptions(void) {
 	printf("Test subscriptions\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("sota.caballo"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("sota", "rey"));
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
 	assert(ps_num_subs(s1) == 1);
 	assert(ps_num_subs(s2) == 2);
-	ps_unsubscribe(s2, "rey");
+	ps_unsubscribe(s2, "baz");
 	assert(ps_num_subs(s1) == 1);
 	assert(ps_num_subs(s2) == 1);
 	ps_free_subscriber(s1);
@@ -26,10 +26,10 @@ void test_subscriptions(void) {
 
 void test_publish(void) {
 	printf("Test publish\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("sota.caballo"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("sota", "rey"));
-	PUB_BOOL("sota.caballo", true);
-	PUB_BOOL("sota", true);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
+	PUB_BOOL("foo.bar", true);
+	PUB_BOOL("foo", true);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 2);
 	assert(ps_stats_live_msg() == 2);
@@ -46,8 +46,8 @@ void test_publish(void) {
 
 void test_sticky(void) {
 	printf("Test sticky\n");
-	PUB_INT_FL("sota", 1, FL_STICKY);
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("sota"));
+	PUB_INT_FL("foo", 1, FL_STICKY);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo"));
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
 	assert(ps_stats_live_msg() == 1); // The sticky message
@@ -57,9 +57,9 @@ void test_sticky(void) {
 
 void test_no_recursive(void) {
 	printf("Test no recursive\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("sota.caballo"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("sota"));
-	PUB_INT_FL("sota.caballo", 1, FL_NONRECURSIVE);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo"));
+	PUB_INT_FL("foo.bar", 1, FL_NONRECURSIVE);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 0);
 	ps_free_subscriber(s1);
@@ -70,12 +70,12 @@ void test_no_recursive(void) {
 void test_pub_get(void) {
 	printf("Test pub->get\n");
 	ps_msg_t *msg;
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("sota.caballo"));
-	PUB_INT("sota.caballo", 1);
-	PUB_DBL("sota.caballo", 1.25);
-	PUB_STR("sota.caballo", "Hello");
-	PUB_ERR("sota.caballo", -1, "Bad result");
-	PUB_BUF("sota.caballo", malloc(10), 10, free);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	PUB_INT("foo.bar", 1);
+	PUB_DBL("foo.bar", 1.25);
+	PUB_STR("foo.bar", "Hello");
+	PUB_ERR("foo.bar", -1, "Bad result");
+	PUB_BUF("foo.bar", malloc(10), 10, free);
 
 	msg = ps_get(s1, 10);
 	assert(IS_INT(msg) && msg->int_val == 1);
@@ -104,10 +104,10 @@ void test_pub_get(void) {
 void test_overflow(void) {
 	printf("Test overflow\n");
 	ps_msg_t *msg;
-	ps_subscriber_t *s1 = ps_new_subscriber(2, STRLIST("sota.caballo"));
-	PUB_INT("sota.caballo", 1);
-	PUB_INT("sota.caballo", 2);
-	PUB_INT("sota.caballo", 3);
+	ps_subscriber_t *s1 = ps_new_subscriber(2, STRLIST("foo.bar"));
+	PUB_INT("foo.bar", 1);
+	PUB_INT("foo.bar", 2);
+	PUB_INT("foo.bar", 3);
 	assert(ps_overflow(s1) == 1);
 	assert(ps_overflow(s1) == 0);
 	msg = ps_get(s1, 10);
