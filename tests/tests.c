@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "pubsub.h"
+#include "../pubsub.c"
 
 void check_leak(void) {
 	assert(ps_stats_live_msg() == 0);
@@ -122,19 +122,18 @@ void test_overflow(void) {
 	check_leak();
 }
 
-void app_main() {
-	ps_init();
+void run_all(void) {
 	test_subscriptions();
 	test_publish();
 	test_sticky();
 	test_no_recursive();
 	test_pub_get();
 	test_overflow();
-
 	printf("All tests passed!\n");
 }
 
 int main(void) {
-	app_main();
+	ps_init();
+	run_all();
 	return 0;
 }
