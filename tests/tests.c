@@ -5,9 +5,21 @@
 
 #include "../pubsub.c"
 
-void check_leak(void) {
+static void check_leak(void) {
+	ps_clean_sticky();
 	assert(ps_stats_live_msg() == 0);
 	assert(ps_stats_live_subscribers() == 0);
+}
+
+static void *inc_thread(void *v) {
+	ps_subscriber_t *s = ps_new_subscriber(10, STRLIST("fun.inc"));
+	PUB_BOOL_FL("thread.ready", true, FL_STICKY);
+	ps_msg_t *msg = ps_get(s, 5000);
+	assert(msg != NULL);
+	assert(IS_INT(msg));
+	PUB_INT(msg->rtopic, msg->int_val + 1); // Response
+	ps_unref_msg(msg);
+	ps_free_subscriber(s);
 }
 
 void test_subscriptions(void) {
@@ -62,7 +74,6 @@ void test_sticky(void) {
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
 	assert(ps_stats_live_msg() == 1); // The sticky message
-	ps_clean_sticky();
 	check_leak();
 }
 
@@ -133,6 +144,34 @@ void test_overflow(void) {
 	check_leak();
 }
 
+void test_call(void) {
+	printf("Test call\n");
+	ps_msg_t *msg = NULL;
+	pthread_t thread;
+	pthread_create(&thread, NULL, inc_thread, NULL);
+	msg = ps_wait_one("thread.ready", 5000);
+	assert(msg != NULL && msg->bool_val == true);
+	ps_unref_msg(msg);
+	msg = CALL_INT("fun.inc", 25, 1000);
+	assert(msg != NULL && msg->int_val == 26);
+	ps_unref_msg(msg);
+	pthread_join(thread, NULL);
+	check_leak();
+}
+
+void test_no_return_path(void) {
+	printf("Test no return path\n");
+	ps_msg_t *msg = NULL;
+	pthread_t thread;
+	pthread_create(&thread, NULL, inc_thread, NULL);
+	msg = ps_wait_one("thread.ready", 5000);
+	assert(msg != NULL && msg->bool_val == true);
+	ps_unref_msg(msg);
+	PUB_INT("fun.inc", 25);
+	pthread_join(thread, NULL);
+	check_leak();
+}
+
 void run_all(void) {
 	test_subscriptions();
 	test_subscribe_many();
@@ -141,6 +180,8 @@ void run_all(void) {
 	test_no_recursive();
 	test_pub_get();
 	test_overflow();
+	test_call();
+	test_no_return_path();
 	printf("All tests passed!\n");
 }
 
