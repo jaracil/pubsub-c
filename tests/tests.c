@@ -24,6 +24,17 @@ void test_subscriptions(void) {
 	check_leak();
 }
 
+void test_subscribe_many(void) {
+	printf("Test subscribe/unsubscribe many\n");
+	ps_subscriber_t *s1 = ps_new_subscriber(10, NULL);
+	assert(ps_subscribe_many(s1, STRLIST("foo", "bar", "baz")) == 3);
+	assert(ps_num_subs(s1) == 3);
+	assert(ps_unsubscribe_many(s1, STRLIST("foo", "bar", "baz")) == 3);
+	assert(ps_num_subs(s1) == 0);
+	ps_free_subscriber(s1);
+	check_leak();
+}
+
 void test_publish(void) {
 	printf("Test publish\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
@@ -124,6 +135,7 @@ void test_overflow(void) {
 
 void run_all(void) {
 	test_subscriptions();
+	test_subscribe_many();
 	test_publish();
 	test_sticky();
 	test_no_recursive();

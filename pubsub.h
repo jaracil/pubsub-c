@@ -71,6 +71,7 @@ ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout);
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
 int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs);
 int ps_unsubscribe(ps_subscriber_t *su, const char *topic);
+int ps_unsubscribe_many(ps_subscriber_t *su, strlist_t subs);
 size_t ps_unsubscribe_all(ps_subscriber_t *su);
 size_t ps_flush(ps_subscriber_t *su);
 size_t ps_num_subs(ps_subscriber_t *su);

@@ -335,6 +335,18 @@ exit_fn:
 	return ret;
 }
 
+int ps_unsubscribe_many(ps_subscriber_t *su, strlist_t subs) {
+	int n = 0;
+	if (subs != NULL) {
+		size_t idx = 0;
+		while (subs[idx] != NULL) {
+			if (ps_unsubscribe(su, subs[idx++]) == 0)
+				n++;
+		}
+	}
+	return n;
+}
+
 size_t ps_unsubscribe_all(ps_subscriber_t *su) {
 	subscriptions_list_t *s, *ps;
 	subscriber_list_t *sl;
