@@ -416,6 +416,11 @@ void ps_clean_sticky(void) {
 		if (tm->sticky != NULL) {
 			ps_unref_msg(tm->sticky);
 			tm->sticky = NULL;
+			if (tm->subscribers == NULL) { // Empty list
+				HASH_DEL(topic_map, tm);
+				free(tm->topic);
+				free(tm);
+			}
 		}
 	}
 	pthread_mutex_unlock(&lock);
