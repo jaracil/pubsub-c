@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "../pubsub.c"
+#include "pubsub.h"
 
 void check_leak(void) {
 	assert(ps_stats_live_msg() == 0);
