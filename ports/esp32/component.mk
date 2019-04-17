@@ -1,0 +1,8 @@
+#
+# Component Makefile
+#
+
+COMPONENT_ADD_INCLUDEDIRS := src
+COMPONENT_SRCDIRS := src
+CFLAGS += -DPS_USE_GETTIMEOFDAY
+
