@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "../pubsub.c"
+#include "pubsub.h"
 
 static void check_leak(void) {
 	ps_clean_sticky();
