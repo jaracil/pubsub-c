@@ -3,6 +3,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "pubsub.h"
 #include "uthash.h"
@@ -45,6 +46,8 @@ struct ps_subscriber_s {
 
 static pthread_mutex_t lock;
 static topic_map_t *topic_map = NULL;
+
+static uint32_t uuid_ctr;
 
 static uint32_t stat_live_msg;
 static uint32_t stat_live_subscribers;
@@ -156,6 +159,9 @@ size_t ps_queue_waiting(ps_queue_t *q) {
 }
 
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
+	if (topic == NULL)
+		return NULL;
+
 	ps_msg_t *msg = calloc(1, sizeof(ps_msg_t));
 	va_list args;
 	va_start(args, flags);
@@ -164,10 +170,6 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
 	msg->flags = flags;
 	msg->topic = strdup(topic);
 	msg->rtopic = NULL;
-
-	if (flags & FL_RESP) {
-		msg->rtopic = strdup((va_arg(args, char *)));
-	}
 
 	if (IS_INT(msg)) {
 		msg->int_val = (va_arg(args, int64_t));
@@ -189,6 +191,16 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
 	}
 	__sync_add_and_fetch(&stat_live_msg, 1);
 	return msg;
+}
+
+void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic) {
+	if (msg->rtopic != NULL) {
+		free(msg->rtopic); // Free previous rtopic
+		msg->rtopic = NULL;
+	}
+	if (rtopic != NULL) {
+		msg->rtopic = strdup(rtopic);
+	}
 }
 
 ps_msg_t *ps_ref_msg(ps_msg_t *msg) {
@@ -404,12 +416,19 @@ void ps_clean_sticky(void) {
 		if (tm->sticky != NULL) {
 			ps_unref_msg(tm->sticky);
 			tm->sticky = NULL;
+			if (tm->subscribers == NULL) { // Empty list
+				HASH_DEL(topic_map, tm);
+				free(tm->topic);
+				free(tm);
+			}
 		}
 	}
 	pthread_mutex_unlock(&lock);
 }
 
 size_t ps_publish(ps_msg_t *msg) {
+	if (msg == NULL)
+		return 0;
 	topic_map_t *tm;
 	subscriber_list_t *sl;
 	size_t ret = 0;
@@ -453,4 +472,26 @@ size_t ps_publish(ps_msg_t *msg) {
 	free(topic);
 	pthread_mutex_unlock(&lock);
 	return ret;
+}
+
+ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout) {
+	ps_msg_t *ret_msg = NULL;
+	char rtopic[32] = {0};
+
+	snprintf(rtopic, sizeof(rtopic), "$r.%u", __sync_add_and_fetch(&uuid_ctr, 1));
+	ps_msg_set_rtopic(msg, rtopic);
+	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST(rtopic));
+	ps_publish(msg);
+	ret_msg = ps_get(su, timeout);
+	ps_free_subscriber(su);
+	return ret_msg;
+}
+
+ps_msg_t *ps_wait_one(const char *topic, int64_t timeout) {
+	ps_msg_t *ret_msg = NULL;
+
+	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST(topic));
+	ret_msg = ps_get(su, timeout);
+	ps_free_subscriber(su);
+	return ret_msg;
 }
