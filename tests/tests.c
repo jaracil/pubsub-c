@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
 
 #include "pubsub.h"
 
@@ -20,6 +21,7 @@ static void *inc_thread(void *v) {
 	PUB_INT(msg->rtopic, msg->int_val + 1); // Response
 	ps_unref_msg(msg);
 	ps_free_subscriber(s);
+	return NULL;
 }
 
 void test_subscriptions(void) {
