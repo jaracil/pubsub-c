@@ -72,8 +72,12 @@ void test_publish(void) {
 void test_sticky(void) {
 	printf("Test sticky\n");
 	PUB_INT_FL("foo", 1, FL_STICKY);
+	PUB_INT_FL("foo", 2, FL_STICKY); // Last sticky override previous
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo"));
 	assert(ps_waiting(s1) == 1);
+	ps_msg_t *msg = ps_get(s1, -1);
+	assert(msg->int_val == 2);
+	ps_unref_msg(msg);
 	ps_free_subscriber(s1);
 	assert(ps_stats_live_msg() == 1); // The sticky message
 	check_leak();
