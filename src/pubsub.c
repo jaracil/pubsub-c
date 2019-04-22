@@ -228,7 +228,7 @@ void ps_unref_msg(ps_msg_t *msg) {
 	}
 }
 
-size_t ps_stats_live_msg(void) {
+int ps_stats_live_msg(void) {
 	return __sync_fetch_and_add(&stat_live_msg, 0);
 }
 
@@ -249,12 +249,12 @@ void ps_free_subscriber(ps_subscriber_t *su) {
 	__sync_sub_and_fetch(&stat_live_subscribers, 1);
 }
 
-size_t ps_stats_live_subscribers(void) {
+int ps_stats_live_subscribers(void) {
 	return __sync_fetch_and_add(&stat_live_subscribers, 0);
 }
 
-size_t ps_flush(ps_subscriber_t *su) {
-	size_t flushed = 0;
+int ps_flush(ps_subscriber_t *su) {
+	int flushed = 0;
 	ps_msg_t *msg = NULL;
 	while ((msg = ps_queue_pull(su->q, 0)) != NULL) {
 		ps_unref_msg(msg);
@@ -359,7 +359,7 @@ int ps_unsubscribe_many(ps_subscriber_t *su, strlist_t subs) {
 	return n;
 }
 
-size_t ps_unsubscribe_all(ps_subscriber_t *su) {
+int ps_unsubscribe_all(ps_subscriber_t *su) {
 	subscriptions_list_t *s, *ps;
 	subscriber_list_t *sl;
 	size_t count = 0;
@@ -391,18 +391,18 @@ ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout) {
 	return ps_queue_pull(su->q, timeout);
 }
 
-size_t ps_num_subs(ps_subscriber_t *su) {
-	size_t count;
+int ps_num_subs(ps_subscriber_t *su) {
+	int count;
 	subscriptions_list_t *elt;
 	DL_COUNT(su->subs, elt, count);
 	return count;
 }
 
-size_t ps_waiting(ps_subscriber_t *su) {
+int ps_waiting(ps_subscriber_t *su) {
 	return ps_queue_waiting(su->q);
 }
 
-size_t ps_overflow(ps_subscriber_t *su) {
+int ps_overflow(ps_subscriber_t *su) {
 	uint32_t n = __sync_fetch_and_sub(&su->overflow, 0);
 	__sync_fetch_and_sub(&su->overflow, n);
 	return n;
@@ -426,7 +426,7 @@ void ps_clean_sticky(void) {
 	pthread_mutex_unlock(&lock);
 }
 
-size_t ps_publish(ps_msg_t *msg) {
+int ps_publish(ps_msg_t *msg) {
 	if (msg == NULL)
 		return 0;
 	topic_map_t *tm;

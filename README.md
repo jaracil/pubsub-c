@@ -8,7 +8,7 @@ For example, a instances can publish it's temperature value in `<instance_name>.
 
 Other useful way modules use the pubsub system is when they offer an API to other modules or to other software. For example, the temperature module offers the topic `<instance_name>.cmd.set.scale` on the pubsub to send "ºC" or "ºF".
 
-In addition, some topics in the pubsub expect the publisher to provide a pubsub response topic to publish a response. For example, a component is can publish to topic to the temperature component using  `<instance_name>.cmd.get.cfg`, witch packs the configuration and publishes the result in the response topic the caller provided. The response can be flagged as an error too if something failed.
+In addition, some topics in the pubsub expect the publisher to provide a pubsub response topic to publish a response. For example, a component can publish to topic to the temperature component using  `<instance_name>.cmd.get.cfg`, witch packs the configuration and publishes the result in the response topic the caller provided. The response can be flagged as an error too if something failed.
 
 ## Types of data
 
