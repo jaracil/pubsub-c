@@ -271,10 +271,10 @@ void ps_clean_sticky(void);
  * message received
  *
  */
-#define IS_INT(m) (((m)->flags & MSK_TYP) == INT_TYP)
-#define IS_DBL(m) (((m)->flags & MSK_TYP) == DBL_TYP)
-#define IS_PTR(m) (((m)->flags & MSK_TYP) == PTR_TYP)
-#define IS_STR(m) (((m)->flags & MSK_TYP) == STR_TYP)
-#define IS_BOOL(m) (((m)->flags & MSK_TYP) == BOOL_TYP)
-#define IS_BUF(m) (((m)->flags & MSK_TYP) == BUF_TYP)
-#define IS_ERR(m) (((m)->flags & MSK_TYP) == ERR_TYP)
+#define IS_INT(m) ((m) != NULL && ((m)->flags & MSK_TYP) == INT_TYP)
+#define IS_DBL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == DBL_TYP)
+#define IS_PTR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == PTR_TYP)
+#define IS_STR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == STR_TYP)
+#define IS_BOOL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BOOL_TYP)
+#define IS_BUF(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BUF_TYP)
+#define IS_ERR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == ERR_TYP)
