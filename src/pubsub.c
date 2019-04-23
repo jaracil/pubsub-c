@@ -204,11 +204,14 @@ void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic) {
 }
 
 ps_msg_t *ps_ref_msg(ps_msg_t *msg) {
-	__sync_add_and_fetch(&msg->_ref, 1);
+	if (msg != NULL)
+		__sync_add_and_fetch(&msg->_ref, 1);
 	return msg;
 }
 
 void ps_unref_msg(ps_msg_t *msg) {
+	if (msg == NULL)
+		return;
 	if (__sync_sub_and_fetch(&msg->_ref, 1) == 0) {
 		free(msg->topic);
 		if (msg->rtopic != NULL) {
