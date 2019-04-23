@@ -8,8 +8,8 @@
 
 /**
  * @brief Flags associated to the message:
- * FL_STICKY: Stores the las message in the queue and automatically publish it to new subscribers.
- * FL_NONRECURSIVE: Only sends the message to the exact topic path, not to part of the path of the topic.
+ * FL_STICKY: Stores the las message sent to the topic and automatically publish it to new subscribers to that topic.
+ * FL_NONRECURSIVE: Only sends the message to the exact topic path, not to the parent topics.
  * INT_TYP: Message of type integer
  * DBL_TYP: Message of type double
  * PTR_TYP: Message of type pointer
@@ -35,6 +35,9 @@ enum msg_flags {
 
 typedef const char *strlist_t[];
 
+/**
+ * @brief Helper macro to make a NULL terminated string array
+ */
 #define STRLIST(...)                                                                                                   \
 	(strlist_t) {                                                                                                      \
 		__VA_ARGS__, NULL                                                                                              \
@@ -78,14 +81,15 @@ typedef struct ps_subscriber_s ps_subscriber_t; // Private definition
 void ps_init(void);
 
 /**
- * @brief ps_new_msg generic method to create a new message to be enqueued or dequeued
+ * @brief ps_new_msg generic method to create a new message to be published
  *
- * @param topic string path where the message is send or received
+ * @param topic string path where the message is published
  * @param flags for specifying the message type.
- * @param ... values
+ * @param ... values (Depends on flags)
  * @return ps_msg_t*
  */
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
+
 /**
  * @brief ps_ref_msg increments the message reference counter
  *
@@ -93,12 +97,14 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
  * @return ps_msg_t*
  */
 ps_msg_t *ps_ref_msg(ps_msg_t *msg);
+
 /**
  * @brief ps_unref_msg decrease the message reference counter
  *
  * @param msg
  */
 void ps_unref_msg(ps_msg_t *msg);
+
 /**
  * @brief ps_msg_set_rtopic sets a response topic for the message
  *
@@ -110,13 +116,14 @@ void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic);
 /**
  * @brief ps_new_subscriber create a new subscriber to a path.
  *
- * @param queue_size of elements to store
- * @param subs string paths to subscribe for messages
+ * @param queue_size of messages to store
+ * @param subs string paths to subscribe for messages (see STRLIST macro)
  * @return ps_subscriber_t*
  */
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
+
 /**
- * @brief ps_free_subscriber frees data from the subscriber and closes the queues.
+ * @brief ps_free_subscriber frees all data from the subscriber, including message queue.
  *
  * @param s subscriber to free.
  */
@@ -126,16 +133,17 @@ void ps_free_subscriber(ps_subscriber_t *s);
  * @brief ps_get get message from subscribers
  *
  * @param su subscriber from where to check if new messages
- * @param timeout in miliseconds to wait.
+ * @param timeout in miliseconds to wait (-1 = waits forever, 0 = don't block).
  * @return ps_msg_t* message value or null if timeout reached.
  */
 ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout);
+
 /**
  * @brief ps_subscribe adds topic to the subscriber instance
  *
  * @param su subscriber instance
  * @param topic string path of topic to subscribe
- * @return int status
+ * @return status (-1 = Error, 0 = Ok)
  */
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
 
@@ -144,87 +152,96 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic);
  *
  * @param su subscriber instance
  * @param subs strings with the paths to subscribe
- * @return int status
+ * @return the number of unsubscribed topics.
  */
 int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs);
+
 /**
  * @brief ps_unsubscribe removes one topic from the subscribe instance
  *
  * @param su subscriber instance
  * @param topic string path to remove
- * @return int state
+ * @return state (-1 = Error, 0 = Ok)
  */
 int ps_unsubscribe(ps_subscriber_t *su, const char *topic);
+
 /**
  * @brief ps_unsubscribe_many removes several topic from the subscribe instance
  *
  * @param su subscriber instance
- * @param subs strings with the paths to subscribe
- * @return int number of unsubscribed topics
+ * @param subs strings with the paths to subscribe (see STRLIST macro)
+ * @return the number of unsubscribed topics
  */
 int ps_unsubscribe_many(ps_subscriber_t *su, strlist_t subs);
+
 /**
  * @brief ps_unsubscribe_all removes all topic from the subscribe instance
  *
  * @param su subscriber instance
- * @return size_t number of unsubscribed topics
+ * @return the number of unsubscribed topics
  */
-size_t ps_unsubscribe_all(ps_subscriber_t *su);
+int ps_unsubscribe_all(ps_subscriber_t *su);
+
 /**
  * @brief ps_flush clears all messages pending in the queue
  *
  * @param su subscribe instance
- * @return size_t number of freed messages
+ * @return the number of freed messages
  */
-size_t ps_flush(ps_subscriber_t *su);
+int ps_flush(ps_subscriber_t *su);
+
 /**
  * @brief ps_num_subs gives the number of topics subscribed to
  *
  * @param su subscribe instance
- * @return size_t number of subscribed topics
+ * @return the number of subscribed topics
  */
-size_t ps_num_subs(ps_subscriber_t *su);
+int ps_num_subs(ps_subscriber_t *su);
+
 /**
  * @brief ps_waiting gives the number of messages pending to read from subscriber
  *
  * @param su subscribe instance
  * @return size_t number of subscribed topics
  */
-size_t ps_waiting(ps_subscriber_t *su);
+int ps_waiting(ps_subscriber_t *su);
+
 /**
- * @brief ps_overflow gives the number of messages that could not store in the queue because overflow of the queue
- *
+ * @brief ps_overflow gives the number of messages that could not be stored in the queue because it was full.
+ *        Calling this function resets the overflow counter.
  * @param su subscribe instance
- * @return size_t number of messages overflowed
+ * @return the number of messages overflowed
  */
-size_t ps_overflow(ps_subscriber_t *su);
+int ps_overflow(ps_subscriber_t *su);
 
 /**
  * @brief ps_publish publishes a message
  *
  * @param msg message instance
- * @return size_t number of topics the message was sent to
+ * @return the number of subscribers the message was delivered to
  */
-size_t ps_publish(ps_msg_t *msg);
+int ps_publish(ps_msg_t *msg);
+
 /**
  * @brief ps_call create publishes a message, generate a rtopic and waits for a response.
  *
  * @param msg message instance
- * @param timeout timeout in miliseconds to wait for response
+ * @param timeout timeout in miliseconds to wait for response (-1 = waits forever)
  * @return ps_msg_t* message response or null if timeout expired
  */
 ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout);
+
 /**
  * @brief ps_wait_one waits one message without creating the subscriber instace
  *
  * @param topic string path of topic to subscribe
- * @param timeout timeout in miliseconds to wait for response
+ * @param timeout timeout in miliseconds to wait for response (-1 = waits forever)
  * @return ps_msg_t* message response or null if timeout expired
  */
 ps_msg_t *ps_wait_one(const char *topic, int64_t timeout);
 
-size_t ps_stats_live_msg(void);
-size_t ps_stats_live_subscribers(void);
+int ps_stats_live_msg(void);
+int ps_stats_live_subscribers(void);
 void ps_clean_sticky(void);
 
 /**
