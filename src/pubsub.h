@@ -1,5 +1,15 @@
 #pragma once
 
+/**
+ * @file pubsub.h
+ * @José Luis Aracil (pepe.aracil.gomez@gmail.com)
+ * @brief
+ * @version 0.1
+ * @date 2019-04-23
+ *
+ * @copyright Copyright (c) 2019
+ */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -18,7 +28,6 @@
  * BOOL_TYP: Message of type boolean
  * ERR_TYP: Message of type error
  * MSK_TYP: Mask used for getting the message type.
- *
  */
 enum msg_flags {
 	FL_STICKY = 1 << 0,
@@ -76,7 +85,6 @@ typedef struct ps_subscriber_s ps_subscriber_t; // Private definition
 
 /**
  * @brief ps_init initializes the publish/subscribe internal context.
- *
  */
 void ps_init(void);
 
@@ -87,7 +95,6 @@ void ps_init(void);
  * @param flags for specifying the message type.
  * @param ... values (Depends on flags)
  * @return ps_msg_t*
- */
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
 
 /**
@@ -95,7 +102,6 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
  *
  * @param msg
  * @return ps_msg_t*
- */
 ps_msg_t *ps_ref_msg(ps_msg_t *msg);
 
 /**
@@ -119,7 +125,6 @@ void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic);
  * @param queue_size of messages to store
  * @param subs string paths to subscribe for messages (see STRLIST macro)
  * @return ps_subscriber_t*
- */
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
 
 /**
@@ -247,7 +252,6 @@ void ps_clean_sticky(void);
 /**
  * @brief PUB_INT_FL PUB_DBL_FL PUB_PTR_FL PUB_STR_FL PUB_BOOL_FL PUB_BUF_FL PUB_ERR_FL are macros for simplifying the
  * publish method of messages with flags
- *
  */
 #define PUB_INT_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | INT_TYP, (int64_t)(val)))
 #define PUB_DBL_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | DBL_TYP, (double) (val)))
@@ -261,7 +265,6 @@ void ps_clean_sticky(void);
 /**
  * @brief PUB_INT PUB_DBL PUB_PTR PUB_STR PUB_BOOL PUB_BUF PUB_ERR are macros for simplifying the publish method of
  * messages without flags
- *
  */
 #define PUB_INT(topic, val) PUB_INT_FL(topic, val, 0)
 #define PUB_DBL(topic, val) PUB_DBL_FL(topic, val, 0)
@@ -273,7 +276,6 @@ void ps_clean_sticky(void);
 
 /**
  * @brief CALL_INT CALL_DBL CALL_PTR CALL_STR CALL_BOOL CALL_BUF are macros for simplifying the call method of messages
- *
  */
 #define CALL_INT(topic, val, timeout) ps_call(ps_new_msg(topic, INT_TYP, (int64_t)(val)), (timeout))
 #define CALL_DBL(topic, val, timeout) ps_call(ps_new_msg(topic, DBL_TYP, (double) (val)), (timeout))
@@ -286,7 +288,6 @@ void ps_clean_sticky(void);
 /**
  * @brief IS_INT IS_DBL IS_PTR IS_STR IS_BOOL IS_BUF IS_ERR are macros for simplifying the way of checking the type of
  * message received
- *
  */
 #define IS_INT(m) ((m) != NULL && ((m)->flags & MSK_TYP) == INT_TYP)
 #define IS_DBL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == DBL_TYP)

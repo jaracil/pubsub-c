@@ -5,3 +5,5 @@ sdkconfig
 *~
 *.out
 *.gc*
+/docs/xml
+/docs/html
