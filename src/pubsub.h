@@ -250,6 +250,33 @@ ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout);
  */
 ps_msg_t *ps_wait_one(const char *topic, int64_t timeout);
 
+/**
+ * @brief ps_has_topic_prefix returns true if topic of msg starts with prefix
+ *
+ * @param msg message instance
+ * @param pre topic prefix to check
+ * @return bool true if message topic starts with prefix
+ */
+bool ps_has_topic_prefix(ps_msg_t *msg, const char *pre);
+
+/**
+ * @brief ps_has_topic_suffix returns true if topic of msg ends with suffix
+ *
+ * @param msg is the message instance
+ * @param suf is the topic suffix to check
+ * @return bool true if message topic ends with suffix
+ */
+bool ps_has_topic_suffix(ps_msg_t *msg, const char *suf);
+
+/**
+ * @brief ps_has_topic returns true if topic of msg and topic are equal
+ *
+ * @param msg is the message instance
+ * @param topic is the topic to check
+ * @return bool true if message topic and topic are equal
+ */
+bool ps_has_topic(ps_msg_t *msg, const char *topic);
+
 int ps_stats_live_msg(void);
 int ps_stats_live_subscribers(void);
 void ps_clean_sticky(void);

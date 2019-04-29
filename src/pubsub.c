@@ -498,3 +498,28 @@ ps_msg_t *ps_wait_one(const char *topic, int64_t timeout) {
 	ps_free_subscriber(su);
 	return ret_msg;
 }
+
+bool ps_has_topic_prefix(ps_msg_t *msg, const char *pre) {
+	if (msg == NULL) {
+		return false;
+	}
+	return strncmp(pre, msg->topic, strlen(pre)) == 0;
+}
+
+bool ps_has_topic_suffix(ps_msg_t *msg, const char *suf) {
+	if (msg == NULL) {
+		return false;
+	}
+	size_t lsuf = strlen(suf), ltopic = strlen(msg->topic);
+	if (lsuf <= ltopic) {
+		return strcmp(suf, &msg->topic[ltopic - lsuf]) == 0;
+	}
+	return false;
+}
+
+bool ps_has_topic(ps_msg_t *msg, const char *topic) {
+	if (msg == NULL) {
+		return false;
+	}
+	return strcmp(topic, msg->topic) == 0;
+}
