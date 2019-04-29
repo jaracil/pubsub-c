@@ -27,6 +27,7 @@
  * BUF_TYP: Message of type buffer
  * BOOL_TYP: Message of type boolean
  * ERR_TYP: Message of type error
+ * NIL_TYP: Message of type nil/null
  * MSK_TYP: Mask used for getting the message type.
  */
 enum msg_flags {
@@ -39,6 +40,7 @@ enum msg_flags {
 	BUF_TYP = 0x00000500u,
 	BOOL_TYP = 0x00000600u,
 	ERR_TYP = 0x00000700u,
+	NIL_TYP = 0x00000800u,
 	MSK_TYP = 0x00000F00u,
 };
 
@@ -94,7 +96,8 @@ void ps_init(void);
  * @param topic string path where the message is published
  * @param flags for specifying the message type.
  * @param ... values (Depends on flags)
- * @return ps_msg_t*
+ * @return ps_msg_t
+ */
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
 
 /**
@@ -102,6 +105,7 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
  *
  * @param msg
  * @return ps_msg_t*
+ */
 ps_msg_t *ps_ref_msg(ps_msg_t *msg);
 
 /**
@@ -125,6 +129,7 @@ void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic);
  * @param queue_size of messages to store
  * @param subs string paths to subscribe for messages (see STRLIST macro)
  * @return ps_subscriber_t*
+ */
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
 
 /**
@@ -261,6 +266,7 @@ void ps_clean_sticky(void);
 #define PUB_BUF_FL(topic, ptr, sz, dtor, fl)                                                                           \
 	ps_publish(ps_new_msg(topic, (fl) | BUF_TYP, (void *) (ptr), (size_t)(sz), (ps_dtor_t)(dtor)));
 #define PUB_ERR_FL(topic, id, desc, fl) ps_publish(ps_new_msg(topic, (fl) | ERR_TYP, (int) (id), (char *) (desc)))
+#define PUB_NIL_FL(topic, fl) ps_publish(ps_new_msg(topic, (fl) | NIL_TYP))
 
 /**
  * @brief PUB_INT PUB_DBL PUB_PTR PUB_STR PUB_BOOL PUB_BUF PUB_ERR are macros for simplifying the publish method of
@@ -273,6 +279,7 @@ void ps_clean_sticky(void);
 #define PUB_BOOL(topic, val) PUB_BOOL_FL(topic, val, 0)
 #define PUB_BUF(topic, ptr, sz, dtor) PUB_BUF_FL(topic, ptr, sz, dtor, 0)
 #define PUB_ERR(topic, id, desc) PUB_ERR_FL(topic, id, desc, 0)
+#define PUB_NIL(topic) PUB_NIL_FL(topic, 0)
 
 /**
  * @brief CALL_INT CALL_DBL CALL_PTR CALL_STR CALL_BOOL CALL_BUF are macros for simplifying the call method of messages
