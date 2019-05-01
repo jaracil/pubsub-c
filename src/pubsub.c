@@ -21,6 +21,7 @@ typedef struct ps_queue_s {
 
 typedef struct subscriber_list_s {
 	ps_subscriber_t *su;
+	bool hidden;
 	struct subscriber_list_s *next;
 	struct subscriber_list_s *prev;
 } subscriber_list_t;
@@ -483,8 +484,10 @@ int ps_publish(ps_msg_t *msg) {
 				if (ps_queue_push(sl->su->q, msg) != 0) {
 					__sync_add_and_fetch(&sl->su->overflow, 1);
 					ps_unref_msg(msg);
+				} else {
+					if (!sl->hidden)
+						ret++;
 				}
-				ret++;
 			}
 		}
 		if (msg->flags & FL_NONRECURSIVE)
