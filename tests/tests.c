@@ -178,6 +178,20 @@ void test_no_return_path(void) {
 	check_leak();
 }
 
+void test_topic_prefix_suffix(void) {
+	printf("Test has_topic, has_topic_prefix, has_topic_suffix\n");
+	ps_msg_t *msg;
+	ps_subscriber_t *s1 = ps_new_subscriber(2, STRLIST("foo.bar"));
+	PUB_NIL("foo.bar");
+	msg = ps_get(s1, 10);
+	assert(ps_has_topic(msg, "foo.bar"));
+	assert(ps_has_topic_prefix(msg, "foo."));
+	assert(ps_has_topic_suffix(msg, ".bar"));
+	ps_unref_msg(msg);
+	ps_free_subscriber(s1);
+	check_leak();
+}
+
 void run_all(void) {
 	test_subscriptions();
 	test_subscribe_many();
@@ -188,6 +202,7 @@ void run_all(void) {
 	test_overflow();
 	test_call();
 	test_no_return_path();
+	test_topic_prefix_suffix();
 	printf("All tests passed!\n");
 }
 
