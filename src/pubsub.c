@@ -235,6 +235,39 @@ int ps_stats_live_msg(void) {
 	return __sync_fetch_and_add(&stat_live_msg, 0);
 }
 
+static int free_topic_if_empty(topic_map_t *tm) {
+	if (tm->subscribers == NULL && tm->sticky == NULL) {
+		HASH_DEL(topic_map, tm);
+		free(tm->topic);
+		free(tm);
+		return 1;
+	}
+	return 0;
+}
+
+static topic_map_t *create_topic(const char *topic) {
+	topic_map_t *tm;
+	tm = calloc(1, sizeof(*tm));
+	tm->topic = strdup(topic);
+	HASH_ADD_KEYPTR(hh, topic_map, tm->topic, strlen(tm->topic), tm);
+	return tm;
+}
+
+static topic_map_t *fetch_topic(const char *topic) {
+	topic_map_t *tm;
+	HASH_FIND_STR(topic_map, topic, tm);
+	return tm;
+}
+
+static topic_map_t *fetch_topic_create_if_not_exist(const char *topic) {
+	topic_map_t *tm;
+	tm = fetch_topic(topic);
+	if (tm == NULL) {
+		tm = create_topic(topic);
+	}
+	return tm;
+}
+
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs) {
 	ps_subscriber_t *su = calloc(1, sizeof(ps_subscriber_t));
 	su->q = ps_new_queue(queue_size);
@@ -285,12 +318,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic) {
 	subscriptions_list_t *subs;
 
 	pthread_mutex_lock(&lock);
-	HASH_FIND_STR(topic_map, topic, tm);
-	if (tm == NULL) {
-		tm = calloc(1, sizeof(*tm));
-		tm->topic = strdup(topic);
-		HASH_ADD_KEYPTR(hh, topic_map, tm->topic, strlen(tm->topic), tm);
-	}
+	tm = fetch_topic_create_if_not_exist(topic);
 	DL_SEARCH_SCALAR(tm->subscribers, sl, su, su);
 	if (sl != NULL) {
 		ret = -1;
@@ -322,7 +350,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 	subscriptions_list_t *subs;
 
 	pthread_mutex_lock(&lock);
-	HASH_FIND_STR(topic_map, topic, tm);
+	tm = fetch_topic(topic);
 	if (tm == NULL) {
 		ret = -1;
 		goto exit_fn;
@@ -334,11 +362,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 	}
 	DL_DELETE(tm->subscribers, sl);
 	free(sl);
-	if (tm->subscribers == NULL && tm->sticky == NULL) { // Empty list
-		HASH_DEL(topic_map, tm);
-		free(tm->topic);
-		free(tm);
-	}
+	free_topic_if_empty(tm);
 	DL_SEARCH_SCALAR(su->subs, subs, tm, tm);
 	if (subs != NULL) {
 		DL_DELETE(su->subs, subs);
@@ -374,11 +398,7 @@ int ps_unsubscribe_all(ps_subscriber_t *su) {
 		if (sl != NULL) {
 			DL_DELETE(s->tm->subscribers, sl);
 			free(sl);
-			if (s->tm->subscribers == NULL && s->tm->sticky == NULL) { // Empty list
-				HASH_DEL(topic_map, s->tm);
-				free(s->tm->topic);
-				free(s->tm);
-			}
+			free_topic_if_empty(s->tm);
 		}
 		ps = s;
 		s = s->next;
@@ -419,11 +439,7 @@ void ps_clean_sticky(void) {
 		if (tm->sticky != NULL) {
 			ps_unref_msg(tm->sticky);
 			tm->sticky = NULL;
-			if (tm->subscribers == NULL) { // Empty list
-				HASH_DEL(topic_map, tm);
-				free(tm->topic);
-				free(tm);
-			}
+			free_topic_if_empty(tm);
 		}
 	}
 	pthread_mutex_unlock(&lock);
@@ -437,20 +453,30 @@ int ps_publish(ps_msg_t *msg) {
 	size_t ret = 0;
 	char *topic = strdup(msg->topic);
 	pthread_mutex_lock(&lock);
-	if (msg->flags & FL_STICKY) {
-		HASH_FIND_STR(topic_map, topic, tm);
-		if (tm == NULL) {
-			tm = calloc(1, sizeof(*tm));
-			tm->topic = strdup(topic);
-			HASH_ADD_KEYPTR(hh, topic_map, tm->topic, strlen(tm->topic), tm);
-		}
-		if (tm->sticky != NULL) {
-			ps_unref_msg(tm->sticky);
-		}
-		tm->sticky = ps_ref_msg(msg);
-	}
+	bool first = true;
 	while (strlen(topic) > 0) {
-		HASH_FIND_STR(topic_map, topic, tm);
+		tm = fetch_topic(topic);
+		if (first) {
+			first = false;
+			if (msg->flags & FL_STICKY) {
+				if (tm == NULL) {
+					tm = create_topic(topic);
+				}
+				if (tm->sticky != NULL) {
+					ps_unref_msg(tm->sticky);
+				}
+				tm->sticky = ps_ref_msg(msg);
+			} else {
+				if (tm != NULL && tm->sticky != NULL) {
+					ps_unref_msg(tm->sticky);
+					tm->sticky = NULL;
+					if (free_topic_if_empty(tm)) {
+						tm = NULL;
+					}
+				}
+			}
+		}
+
 		if (tm != NULL) {
 			DL_FOREACH (tm->subscribers, sl) {
 				ps_ref_msg(msg);

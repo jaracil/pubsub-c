@@ -80,6 +80,8 @@ void test_sticky(void) {
 	ps_unref_msg(msg);
 	ps_free_subscriber(s1);
 	assert(ps_stats_live_msg() == 1); // The sticky message
+	PUB_INT("foo", 3);                // Publish normal message on the same path, unsticks previous sitcked message
+	assert(ps_stats_live_msg() == 0);
 	check_leak();
 }
 
