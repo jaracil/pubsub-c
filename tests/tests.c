@@ -97,6 +97,18 @@ void test_sticky(void) {
 	check_leak();
 }
 
+void test_no_sticky_flag(void) {
+	printf("Test no sticky flag\n");
+	PUB_INT_FL("foo", 1, FL_STICKY);
+	ps_subscriber_t *s1 =
+	ps_new_subscriber(10, STRLIST("foo s!")); // Ignore sticky mesages published before subscription
+	assert(ps_waiting(s1) == 0);
+	PUB_INT_FL("foo", 2, FL_STICKY); // This is a new message (published after subscription)
+	assert(ps_waiting(s1) == 1);
+	ps_free_subscriber(s1);
+	check_leak();
+}
+
 void test_no_recursive(void) {
 	printf("Test no recursive\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
@@ -212,6 +224,7 @@ void run_all(void) {
 	test_subscribe_many();
 	test_publish();
 	test_sticky();
+	test_no_sticky_flag();
 	test_no_recursive();
 	test_pub_get();
 	test_overflow();

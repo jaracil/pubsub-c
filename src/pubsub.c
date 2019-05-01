@@ -321,6 +321,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	char *topic = strdup(topic_orig);
 
 	bool hidden_flag = false;
+	bool nosticky_flag = false;
 	bool in_flag = false;
 
 	for (int idx = strlen(topic) - 1; idx > 0; idx--) {
@@ -334,6 +335,9 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 			switch (topic[idx]) {
 			case 'h':
 				hidden_flag = true;
+				break;
+			case 's':
+				nosticky_flag = true;
 				break;
 			}
 			topic[idx] = 0;
@@ -356,11 +360,13 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	subs = calloc(1, sizeof(*subs));
 	subs->tm = tm;
 	DL_APPEND(su->subs, subs);
-	if (tm->sticky != NULL) {
-		ps_ref_msg(tm->sticky);
-		if (ps_queue_push(su->q, tm->sticky) != 0) {
-			__sync_add_and_fetch(&su->overflow, 1);
-			ps_unref_msg(tm->sticky);
+	if (!nosticky_flag) {
+		if (tm->sticky != NULL) {
+			ps_ref_msg(tm->sticky);
+			if (ps_queue_push(su->q, tm->sticky) != 0) {
+				__sync_add_and_fetch(&su->overflow, 1);
+				ps_unref_msg(tm->sticky);
+			}
 		}
 	}
 
