@@ -38,6 +38,18 @@ void test_subscriptions(void) {
 	check_leak();
 }
 
+void test_hidden_subscription(void) {
+	printf("Test hidden subscription\n");
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo.bar h!"));
+	assert(PUB_NIL("foo.bar") == 1);
+	assert(ps_waiting(s1) == 1);
+	assert(ps_waiting(s2) == 1);
+	ps_free_subscriber(s1);
+	ps_free_subscriber(s2);
+	check_leak();
+}
+
 void test_subscribe_many(void) {
 	printf("Test subscribe/unsubscribe many\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, NULL);
@@ -196,6 +208,7 @@ void test_topic_prefix_suffix(void) {
 
 void run_all(void) {
 	test_subscriptions();
+	test_hidden_subscription();
 	test_subscribe_many();
 	test_publish();
 	test_sticky();

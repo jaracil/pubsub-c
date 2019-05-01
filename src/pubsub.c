@@ -312,11 +312,35 @@ int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs) {
 	return n;
 }
 
-int ps_subscribe(ps_subscriber_t *su, const char *topic) {
+int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	int ret = 0;
 	topic_map_t *tm;
 	subscriber_list_t *sl;
 	subscriptions_list_t *subs;
+
+	char *topic = strdup(topic_orig);
+
+	bool hidden_flag = false;
+	bool in_flag = false;
+
+	for (int idx = strlen(topic) - 1; idx > 0; idx--) {
+		if (topic[idx] == ' ') {
+			in_flag = false;
+			topic[idx] = 0;
+		} else if (topic[idx] == '!') {
+			in_flag = true;
+		} else if (in_flag) {
+			in_flag = false;
+			switch (topic[idx]) {
+			case 'h':
+				hidden_flag = true;
+				break;
+			}
+			topic[idx] = 0;
+		} else {
+			break;
+		}
+	}
 
 	pthread_mutex_lock(&lock);
 	tm = fetch_topic_create_if_not_exist(topic);
@@ -327,6 +351,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic) {
 	}
 	sl = calloc(1, sizeof(*sl));
 	sl->su = su;
+	sl->hidden = hidden_flag;
 	DL_APPEND(tm->subscribers, sl);
 	subs = calloc(1, sizeof(*subs));
 	subs->tm = tm;
@@ -341,6 +366,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic) {
 
 exit_fn:
 	pthread_mutex_unlock(&lock);
+	free(topic);
 	return ret;
 }
 
