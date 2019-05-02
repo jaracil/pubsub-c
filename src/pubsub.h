@@ -279,7 +279,7 @@ bool ps_has_topic(ps_msg_t *msg, const char *topic);
 
 int ps_stats_live_msg(void);
 int ps_stats_live_subscribers(void);
-void ps_clean_sticky(void);
+void ps_clean_sticky(const char *prefix);
 
 /**
  * @brief PUB_INT_FL PUB_DBL_FL PUB_PTR_FL PUB_STR_FL PUB_BOOL_FL PUB_BUF_FL PUB_ERR_FL are macros for simplifying the

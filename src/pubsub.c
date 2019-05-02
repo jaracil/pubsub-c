@@ -269,6 +269,29 @@ static topic_map_t *fetch_topic_create_if_not_exist(const char *topic) {
 	return tm;
 }
 
+static int push_subscriber_queue(ps_subscriber_t *su, ps_msg_t *msg) {
+	ps_ref_msg(msg);
+	if (ps_queue_push(su->q, msg) != 0) {
+		__sync_add_and_fetch(&su->overflow, 1);
+		ps_unref_msg(msg);
+		return -1;
+	}
+	return 0;
+}
+
+static void push_child_sticky(ps_subscriber_t *su, const char *prefix) {
+	topic_map_t *tm, *tm_tmp;
+
+	size_t pl = strlen(prefix);
+	HASH_ITER(hh, topic_map, tm, tm_tmp) {
+		if (pl == 0 || (strncmp(prefix, tm->topic, pl) == 0 && (tm->topic[pl] == 0 || tm->topic[pl] == '.'))) {
+			if (tm->sticky != NULL) {
+				push_subscriber_queue(su, tm->sticky);
+			}
+		}
+	}
+}
+
 ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs) {
 	ps_subscriber_t *su = calloc(1, sizeof(ps_subscriber_t));
 	su->q = ps_new_queue(queue_size);
@@ -321,7 +344,8 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	char *topic = strdup(topic_orig);
 
 	bool hidden_flag = false;
-	bool nosticky_flag = false;
+	bool no_sticky_flag = false;
+	bool child_sticky_flag = false;
 	bool in_flag = false;
 
 	for (int idx = strlen(topic) - 1; idx > 0; idx--) {
@@ -337,7 +361,10 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 				hidden_flag = true;
 				break;
 			case 's':
-				nosticky_flag = true;
+				no_sticky_flag = true;
+				break;
+			case 'S':
+				child_sticky_flag = true;
 				break;
 			}
 			topic[idx] = 0;
@@ -360,12 +387,12 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	subs = calloc(1, sizeof(*subs));
 	subs->tm = tm;
 	DL_APPEND(su->subs, subs);
-	if (!nosticky_flag) {
-		if (tm->sticky != NULL) {
-			ps_ref_msg(tm->sticky);
-			if (ps_queue_push(su->q, tm->sticky) != 0) {
-				__sync_add_and_fetch(&su->overflow, 1);
-				ps_unref_msg(tm->sticky);
+	if (!no_sticky_flag) {
+		if (child_sticky_flag) {
+			push_child_sticky(su, topic);
+		} else {
+			if (tm->sticky != NULL) {
+				push_subscriber_queue(su, tm->sticky);
 			}
 		}
 	}
@@ -464,15 +491,18 @@ int ps_overflow(ps_subscriber_t *su) {
 	return n;
 }
 
-void ps_clean_sticky(void) {
+void ps_clean_sticky(const char *prefix) {
 	topic_map_t *tm, *tm_tmp;
 
+	size_t pl = strlen(prefix);
 	pthread_mutex_lock(&lock);
 	HASH_ITER(hh, topic_map, tm, tm_tmp) {
-		if (tm->sticky != NULL) {
-			ps_unref_msg(tm->sticky);
-			tm->sticky = NULL;
-			free_topic_if_empty(tm);
+		if (pl == 0 || (strncmp(prefix, tm->topic, pl) == 0 && (tm->topic[pl] == 0 || tm->topic[pl] == '.'))) {
+			if (tm->sticky != NULL) {
+				ps_unref_msg(tm->sticky);
+				tm->sticky = NULL;
+				free_topic_if_empty(tm);
+			}
 		}
 	}
 	pthread_mutex_unlock(&lock);
@@ -509,16 +539,10 @@ int ps_publish(ps_msg_t *msg) {
 				}
 			}
 		}
-
 		if (tm != NULL) {
 			DL_FOREACH (tm->subscribers, sl) {
-				ps_ref_msg(msg);
-				if (ps_queue_push(sl->su->q, msg) != 0) {
-					__sync_add_and_fetch(&sl->su->overflow, 1);
-					ps_unref_msg(msg);
-				} else {
-					if (!sl->hidden)
-						ret++;
+				if (push_subscriber_queue(sl->su, msg) == 0 && !sl->hidden) {
+					ret++;
 				}
 			}
 		}

@@ -7,7 +7,7 @@
 #include "pubsub.h"
 
 static void check_leak(void) {
-	ps_clean_sticky();
+	ps_clean_sticky("");
 	assert(ps_stats_live_msg() == 0);
 	assert(ps_stats_live_subscribers() == 0);
 }
@@ -97,6 +97,18 @@ void test_sticky(void) {
 	check_leak();
 }
 
+void test_clean_sticky(void) {
+	printf("Test clean sticky\n");
+	PUB_INT_FL("foo.bar.baz", 1, FL_STICKY);
+	PUB_INT_FL("foo.fiz.fuz", 1, FL_STICKY);
+	assert(ps_stats_live_msg() == 2); // The sticky messages;
+	ps_clean_sticky("foo.bar");       // Remove sticky messages from "foo.bar" prefix
+	assert(ps_stats_live_msg() == 1); // The sticky messages;
+	ps_clean_sticky("foo");           // Remove sticky messages from "foo" prefix
+	assert(ps_stats_live_msg() == 0); // The sticky messages;
+	check_leak();
+}
+
 void test_no_sticky_flag(void) {
 	printf("Test no sticky flag\n");
 	PUB_INT_FL("foo", 1, FL_STICKY);
@@ -106,6 +118,27 @@ void test_no_sticky_flag(void) {
 	PUB_INT_FL("foo", 2, FL_STICKY); // This is a new message (published after subscription)
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
+	check_leak();
+}
+
+void test_child_sticky_flag(void) {
+	printf("Test child sticky flag\n");
+	PUB_NIL_FL("foo.bar.baz", FL_STICKY);
+	PUB_NIL_FL("foo.bar", FL_STICKY);
+	PUB_NIL_FL("foo", FL_STICKY);
+
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo S!")); // Get all child sticky messages
+	assert(ps_waiting(s1) == 3);
+	ps_free_subscriber(s1);
+
+	s1 = ps_new_subscriber(10, STRLIST("foo.bar S!")); // Get all child sticky messages
+	assert(ps_waiting(s1) == 2);
+	ps_free_subscriber(s1);
+
+	s1 = ps_new_subscriber(10, STRLIST("foo.bar.baz S!")); // Get all child sticky messages
+	assert(ps_waiting(s1) == 1);
+	ps_free_subscriber(s1);
+
 	check_leak();
 }
 
@@ -224,7 +257,9 @@ void run_all(void) {
 	test_subscribe_many();
 	test_publish();
 	test_sticky();
+	test_clean_sticky();
 	test_no_sticky_flag();
+	test_child_sticky_flag();
 	test_no_recursive();
 	test_pub_get();
 	test_overflow();
