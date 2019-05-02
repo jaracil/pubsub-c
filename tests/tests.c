@@ -220,6 +220,11 @@ void test_call(void) {
 	msg = CALL_INT("fun.inc", 25, 1000);
 	assert(msg != NULL && msg->int_val == 26);
 	ps_unref_msg(msg);
+
+	msg = CALL_INT("fun.other", 0, 1000000); // If message is not delivered timeout is triggered
+	assert(msg == NULL);
+	ps_unref_msg(msg); // unref_msg suppots NULL messages
+
 	pthread_join(thread, NULL);
 	check_leak();
 }

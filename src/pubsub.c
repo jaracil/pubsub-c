@@ -569,8 +569,11 @@ ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout) {
 	snprintf(rtopic, sizeof(rtopic), "$r.%u", __sync_add_and_fetch(&uuid_ctr, 1));
 	ps_msg_set_rtopic(msg, rtopic);
 	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST(rtopic));
-	ps_publish(msg);
+	if (ps_publish(msg) == 0) {
+		goto exit_fn;
+	}
 	ret_msg = ps_get(su, timeout);
+exit_fn:
 	ps_free_subscriber(su);
 	return ret_msg;
 }
