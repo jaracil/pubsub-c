@@ -261,6 +261,11 @@ void test_topic_prefix_suffix(void) {
 	assert(ps_has_topic(msg, "foo.bar"));
 	assert(ps_has_topic_prefix(msg, "foo."));
 	assert(ps_has_topic_suffix(msg, ".bar"));
+
+	assert(!ps_has_topic(msg, "foo.baz"));
+	assert(!ps_has_topic_prefix(msg, "baz."));
+	assert(!ps_has_topic_suffix(msg, ".baz"));
+
 	ps_unref_msg(msg);
 	ps_free_subscriber(s1);
 	check_leak();
