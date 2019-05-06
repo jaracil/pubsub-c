@@ -109,6 +109,16 @@ void test_clean_sticky(void) {
 	check_leak();
 }
 
+void test_clean_all_children_sticky(void) {
+	printf("Test clean all children sticky\n");
+	PUB_INT_FL("foo.bar.baz", 1, FL_STICKY);
+	PUB_INT_FL("foo.fiz.fuz", 1, FL_STICKY);
+	assert(ps_stats_live_msg() == 2); // The sticky messages;
+	ps_clean_sticky("foo");           // Remove sticky messages from "foo" prefix
+	assert(ps_stats_live_msg() == 0); // The sticky messages;
+	check_leak();
+}
+
 void test_no_sticky_flag(void) {
 	printf("Test no sticky flag\n");
 	PUB_INT_FL("foo", 1, FL_STICKY);
@@ -263,6 +273,7 @@ void run_all(void) {
 	test_publish();
 	test_sticky();
 	test_clean_sticky();
+	test_clean_all_children_sticky();
 	test_no_sticky_flag();
 	test_child_sticky_flag();
 	test_no_recursive();
