@@ -316,6 +316,7 @@ void ps_clean_sticky(const char *prefix);
 #define CALL_PTR(topic, val, timeout) ps_call(ps_new_msg(topic, PTR_TYP, (void *) (val)), (timeout))
 #define CALL_STR(topic, val, timeout) ps_call(ps_new_msg(topic, STR_TYP, (char *) (val)), (timeout))
 #define CALL_BOOL(topic, val, timeout) ps_call(ps_new_msg(topic, BOOL_TYP, (int) (val)), (timeout))
+#define CALL_NIL(topic, timeout) ps_call(ps_new_msg(topic, NIL_TYP), (timeout))
 #define CALL_BUF(topic, ptr, sz, dtor, timeout)                                                                        \
 	ps_call(ps_new_msg(topic, BUF_TYP, (void *) (ptr), (size_t)(sz), (ps_dtor_t)(dtor)), (timeout))
 
@@ -330,3 +331,4 @@ void ps_clean_sticky(const char *prefix);
 #define IS_BOOL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BOOL_TYP)
 #define IS_BUF(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BUF_TYP)
 #define IS_ERR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == ERR_TYP)
+#define IS_NIL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == NIL_TYP)
