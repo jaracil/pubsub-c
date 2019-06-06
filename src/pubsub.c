@@ -247,7 +247,7 @@ static int free_topic_if_empty(topic_map_t *tm) {
 }
 
 static topic_map_t *create_topic(const char *topic) {
-	topic_map_t *tm;
+	topic_map_t *tm = NULL;
 	tm = calloc(1, sizeof(*tm));
 	tm->topic = strdup(topic);
 	HASH_ADD_KEYPTR(hh, topic_map, tm->topic, strlen(tm->topic), tm);
@@ -255,13 +255,13 @@ static topic_map_t *create_topic(const char *topic) {
 }
 
 static topic_map_t *fetch_topic(const char *topic) {
-	topic_map_t *tm;
+	topic_map_t *tm = NULL;
 	HASH_FIND_STR(topic_map, topic, tm);
 	return tm;
 }
 
 static topic_map_t *fetch_topic_create_if_not_exist(const char *topic) {
-	topic_map_t *tm;
+	topic_map_t *tm = NULL;
 	tm = fetch_topic(topic);
 	if (tm == NULL) {
 		tm = create_topic(topic);
@@ -511,8 +511,8 @@ void ps_clean_sticky(const char *prefix) {
 int ps_publish(ps_msg_t *msg) {
 	if (msg == NULL)
 		return 0;
-	topic_map_t *tm;
-	subscriber_list_t *sl;
+	topic_map_t *tm = NULL;
+	subscriber_list_t *sl = NULL;
 	size_t ret = 0;
 	char *topic = strdup(msg->topic);
 	pthread_mutex_lock(&lock);
