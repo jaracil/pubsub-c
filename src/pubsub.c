@@ -194,6 +194,44 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
 	return msg;
 }
 
+ps_msg_t *ps_dup_msg(ps_msg_t const *msg_orig) {
+
+	ps_msg_t *msg = malloc(sizeof(ps_msg_t));
+	memcpy(msg, msg_orig, sizeof(ps_msg_t));
+	msg->_ref = 1;
+	if (msg_orig->topic != NULL) {
+		msg->topic = strdup(msg_orig->topic);
+	}
+	if (msg_orig->rtopic != NULL) {
+		msg->rtopic = strdup(msg_orig->rtopic);
+	}
+
+	if (IS_STR(msg_orig)) {
+		if (msg_orig->str_val != NULL) {
+			msg->str_val = strdup(msg_orig->str_val);
+		}
+	} else if (IS_BUF(msg_orig)) {
+		msg->buf_val.ptr = malloc(msg_orig->buf_val.sz);
+		memcpy(msg->buf_val.ptr, msg_orig->buf_val.ptr, msg_orig->buf_val.sz);
+	} else if (IS_ERR(msg_orig)) {
+		if (msg_orig->err_val.desc != NULL) {
+			msg->err_val.desc = strdup(msg_orig->err_val.desc);
+		}
+	}
+	__sync_add_and_fetch(&stat_live_msg, 1);
+	return msg;
+}
+
+void ps_msg_set_topic(ps_msg_t *msg, const char *topic) {
+	if (msg->topic != NULL) {
+		free(msg->topic); // Free previous topic
+		msg->topic = NULL;
+	}
+	if (topic != NULL) {
+		msg->topic = strdup(topic);
+	}
+}
+
 void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic) {
 	if (msg->rtopic != NULL) {
 		free(msg->rtopic); // Free previous rtopic

@@ -109,6 +109,14 @@ void ps_init(void);
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...);
 
 /**
+ * @brief ps_dup_msg duplicates message
+ *
+ * @param msg_orig message to duplicate
+ * @return ps_msg_t
+ */
+ps_msg_t *ps_dup_msg(ps_msg_t const *msg_orig);
+
+/**
  * @brief ps_ref_msg increments the message reference counter
  *
  * @param msg
@@ -122,6 +130,14 @@ ps_msg_t *ps_ref_msg(ps_msg_t *msg);
  * @param msg
  */
 void ps_unref_msg(ps_msg_t *msg);
+
+/**
+ * @brief ps_msg_set_topic sets message topic
+ *
+ * @param msg message to set the topic
+ * @param topic string with the topic
+ */
+void ps_msg_set_topic(ps_msg_t *msg, const char *topic);
 
 /**
  * @brief ps_msg_set_rtopic sets a response topic for the message
