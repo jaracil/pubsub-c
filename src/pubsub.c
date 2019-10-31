@@ -1,5 +1,4 @@
 #include <stdarg.h>
-#include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -9,7 +8,18 @@
 #include "uthash.h"
 #include "utlist.h"
 
+#ifdef PS_FREE_RTOS
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#else
+#include <pthread.h>
+#endif
+
 typedef struct ps_queue_s {
+#ifdef PS_FREE_RTOS
+	QueueHandle_t queue;
+#else
 	ps_msg_t **messages;
 	size_t size;
 	size_t count;
@@ -17,6 +27,7 @@ typedef struct ps_queue_s {
 	size_t tail;
 	pthread_mutex_t mux;
 	pthread_cond_t not_empty;
+#endif
 } ps_queue_t;
 
 typedef struct subscriber_list_s {
@@ -45,7 +56,12 @@ struct ps_subscriber_s {
 	uint32_t overflow;
 };
 
+#ifdef PS_FREE_RTOS
+static SemaphoreHandle_t lock;
+#else
 static pthread_mutex_t lock;
+#endif
+
 static topic_map_t *topic_map = NULL;
 
 static uint32_t uuid_ctr;
@@ -53,12 +69,24 @@ static uint32_t uuid_ctr;
 static uint32_t stat_live_msg;
 static uint32_t stat_live_subscribers;
 
+#ifdef PS_FREE_RTOS
+#define PORT_LOCK xSemaphoreTake(lock, portMAX_DELAY);
+#define PORT_UNLOCK xSemaphoreGive(lock);
+#else
+#define PORT_LOCK pthread_mutex_lock(&lock);
+#define PORT_UNLOCK pthread_mutex_unlock(&lock);
+#endif
+
 void ps_init(void) {
+#ifdef PS_FREE_RTOS
+	lock = xSemaphoreCreateMutex();
+#else
 	pthread_mutex_init(&lock, NULL);
+#endif
 }
 
+#ifndef PS_FREE_RTOS
 static int deadline_ms(int64_t ms, struct timespec *tout) {
-
 #ifdef PS_USE_GETTIMEOFDAY
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -75,10 +103,14 @@ static int deadline_ms(int64_t ms, struct timespec *tout) {
 	}
 	return 0;
 }
+#endif
 
 ps_queue_t *ps_new_queue(size_t sz) {
 
 	ps_queue_t *q = calloc(1, sizeof(ps_queue_t));
+#ifdef PS_FREE_RTOS
+	q->queue = xQueueCreate(sz, sizeof(void *));
+#else
 	q->size = sz;
 	q->messages = calloc(sz, sizeof(void *));
 	pthread_mutex_init(&q->mux, NULL);
@@ -92,19 +124,30 @@ ps_queue_t *ps_new_queue(size_t sz) {
 	pthread_cond_init(&q->not_empty, &cond_attr);
 	pthread_condattr_destroy(&cond_attr);
 #endif
+#endif
 	return q;
 }
 
 void ps_free_queue(ps_queue_t *q) {
+#ifdef PS_FREE_RTOS
+	vQueueDelete(q->queue);
+#else
 	free(q->messages);
 	pthread_mutex_destroy(&q->mux);
 	pthread_cond_destroy(&q->not_empty);
+#endif
 	free(q);
 }
 
 int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
-	int ret = 0;
 
+#ifdef PS_FREE_RTOS
+	if (xQueueSend(q->queue, &msg, 0) != pdTRUE) {
+		return -1;
+	}
+	return 0;
+#else
+	int ret = 0;
 	pthread_mutex_lock(&q->mux);
 	if (q->count >= q->size) {
 		ret = -1;
@@ -119,10 +162,22 @@ int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
 exit_fn:
 	pthread_mutex_unlock(&q->mux);
 	return ret;
+#endif
 }
 
 ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
 	ps_msg_t *msg = NULL;
+
+#ifdef PS_FREE_RTOS
+	if (timeout < 0) {
+		timeout = portMAX_DELAY;
+	}
+	if (xQueueReceive(q->queue, &msg, timeout / portTICK_PERIOD_MS) != pdTRUE) {
+		return NULL;
+	}
+	return msg;
+
+#else
 	struct timespec tout = {0};
 	bool init_tout = false;
 
@@ -149,14 +204,19 @@ ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
 exit_fn:
 	pthread_mutex_unlock(&q->mux);
 	return msg;
+#endif
 }
 
 size_t ps_queue_waiting(ps_queue_t *q) {
+#ifdef PS_FREE_RTOS
+	return uxQueueMessagesWaiting(q->queue);
+#else
 	size_t res = 0;
 	pthread_mutex_lock(&q->mux);
 	res = q->count;
 	pthread_mutex_unlock(&q->mux);
 	return res;
+#endif
 }
 
 ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
@@ -411,7 +471,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 		}
 	}
 
-	pthread_mutex_lock(&lock);
+	PORT_LOCK
 	tm = fetch_topic_create_if_not_exist(topic);
 	DL_SEARCH_SCALAR(tm->subscribers, sl, su, su);
 	if (sl != NULL) {
@@ -436,7 +496,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	}
 
 exit_fn:
-	pthread_mutex_unlock(&lock);
+	PORT_UNLOCK
 	free(topic);
 	return ret;
 }
@@ -447,7 +507,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 	subscriber_list_t *sl;
 	subscriptions_list_t *subs;
 
-	pthread_mutex_lock(&lock);
+	PORT_LOCK
 	tm = fetch_topic(topic);
 	if (tm == NULL) {
 		ret = -1;
@@ -468,7 +528,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 	}
 
 exit_fn:
-	pthread_mutex_unlock(&lock);
+	PORT_UNLOCK
 	return ret;
 }
 
@@ -489,7 +549,7 @@ int ps_unsubscribe_all(ps_subscriber_t *su) {
 	subscriber_list_t *sl;
 	size_t count = 0;
 
-	pthread_mutex_lock(&lock);
+	PORT_LOCK
 	s = su->subs;
 	while (s != NULL) {
 		DL_SEARCH_SCALAR(s->tm->subscribers, sl, su, su);
@@ -504,7 +564,7 @@ int ps_unsubscribe_all(ps_subscriber_t *su) {
 		count++;
 	}
 	su->subs = NULL;
-	pthread_mutex_unlock(&lock);
+	PORT_UNLOCK
 	return count;
 }
 
@@ -533,7 +593,7 @@ void ps_clean_sticky(const char *prefix) {
 	topic_map_t *tm, *tm_tmp;
 
 	size_t pl = strlen(prefix);
-	pthread_mutex_lock(&lock);
+	PORT_LOCK
 	HASH_ITER(hh, topic_map, tm, tm_tmp) {
 		if (pl == 0 || (strncmp(prefix, tm->topic, pl) == 0 && (tm->topic[pl] == 0 || tm->topic[pl] == '.'))) {
 			if (tm->sticky != NULL) {
@@ -543,7 +603,7 @@ void ps_clean_sticky(const char *prefix) {
 			}
 		}
 	}
-	pthread_mutex_unlock(&lock);
+	PORT_UNLOCK
 }
 
 int ps_publish(ps_msg_t *msg) {
@@ -553,7 +613,7 @@ int ps_publish(ps_msg_t *msg) {
 	subscriber_list_t *sl = NULL;
 	size_t ret = 0;
 	char *topic = strdup(msg->topic);
-	pthread_mutex_lock(&lock);
+	PORT_LOCK
 	bool first = true;
 	while (strlen(topic) > 0) {
 		tm = fetch_topic(topic);
@@ -596,7 +656,7 @@ int ps_publish(ps_msg_t *msg) {
 	}
 	ps_unref_msg(msg);
 	free(topic);
-	pthread_mutex_unlock(&lock);
+	PORT_UNLOCK
 	return ret;
 }
 
