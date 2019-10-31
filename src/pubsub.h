@@ -2,7 +2,7 @@
 
 /**
  * @file pubsub.h
- * @José Luis Aracil (pepe.aracil.gomez@gmail.com)
+ * @author José Luis Aracil (pepe.aracil.gomez@gmail.com)
  * @brief
  * @version 0.1
  * @date 2019-04-23
