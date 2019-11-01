@@ -7,7 +7,6 @@
 
 static void *subscriber_thread(void *v) {
 	ps_subscriber_t *s = ps_new_subscriber(10, STRLIST("main.evt", "main.stopping"));
-	PUB_BOOL_FL("thread.ready", false, FL_STICKY);
 	sleep(1);
 	PUB_BOOL_FL("thread.ready", true, FL_STICKY);
 	printf("Thread: sent ready\n");
@@ -44,7 +43,6 @@ int main(void) {
 
 	pthread_t thread;
 	pthread_create(&thread, NULL, subscriber_thread, NULL);
-	sleep(2); // add some delay
 
 	ps_subscriber_t *sub = ps_new_subscriber(10, STRLIST("thread.ready"));
 	ps_msg_t *msg = ps_get(sub, 5000);
