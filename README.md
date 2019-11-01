@@ -20,6 +20,8 @@ The types of data that can be published and received through the pubsub are:
 * pointer
 * string
 * byte array
+* error type
+* nil type
 
 
 ## Usage examples
@@ -86,7 +88,6 @@ The thread task subscribes to the `"main.evt"` and `"main.stopping"` and sends t
 ```c
 static void *subscriber_thread(void *v) {
 	ps_subscriber_t *s = ps_new_subscriber(10, STRLIST("main.evt", "main.stopping"));
-	PUB_BOOL_FL("thread.ready", false, FL_STICKY);
 	sleep(1);
 	PUB_BOOL_FL("thread.ready", true, FL_STICKY);
 	printf("Thread: sent ready\n");
