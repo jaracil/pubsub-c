@@ -20,8 +20,8 @@ The types of data that can be published and received through the pubsub are:
 * pointer
 * string
 * byte array
-* error type
-* nil type
+* error
+* nil
 
 
 ## Usage examples
