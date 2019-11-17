@@ -444,17 +444,13 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	bool hidden_flag = false;
 	bool no_sticky_flag = false;
 	bool child_sticky_flag = false;
-	bool in_flag = false;
 
-	for (int idx = strlen(topic) - 1; idx > 0; idx--) {
-		if (topic[idx] == ' ') {
-			in_flag = false;
-			topic[idx] = 0;
-		} else if (topic[idx] == '!') {
-			in_flag = true;
-		} else if (in_flag) {
-			in_flag = false;
-			switch (topic[idx]) {
+	char *fl_str = strchr(topic, ' ');
+	if (fl_str != NULL) {
+		*fl_str = '\0';
+		fl_str++;
+		while (*fl_str != '\0') {
+			switch (*fl_str) {
 			case 'h':
 				hidden_flag = true;
 				break;
@@ -465,9 +461,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 				child_sticky_flag = true;
 				break;
 			}
-			topic[idx] = 0;
-		} else {
-			break;
+			fl_str++;
 		}
 	}
 
