@@ -41,7 +41,7 @@ void test_subscriptions(void) {
 void test_hidden_subscription(void) {
 	printf("Test hidden subscription\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo.bar h!"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo.bar h"));
 	assert(PUB_NIL("foo.bar") == 1);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 1);
@@ -123,7 +123,7 @@ void test_no_sticky_flag(void) {
 	printf("Test no sticky flag\n");
 	PUB_INT_FL("foo", 1, FL_STICKY);
 	ps_subscriber_t *s1 =
-	ps_new_subscriber(10, STRLIST("foo s!")); // Ignore sticky mesages published before subscription
+	ps_new_subscriber(10, STRLIST("foo s")); // Ignore sticky mesages published before subscription
 	assert(ps_waiting(s1) == 0);
 	PUB_INT_FL("foo", 2, FL_STICKY); // This is a new message (published after subscription)
 	assert(ps_waiting(s1) == 1);
@@ -137,15 +137,15 @@ void test_child_sticky_flag(void) {
 	PUB_NIL_FL("foo.bar", FL_STICKY);
 	PUB_NIL_FL("foo", FL_STICKY);
 
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo S!")); // Get all child sticky messages
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo S")); // Get all child sticky messages
 	assert(ps_waiting(s1) == 3);
 	ps_free_subscriber(s1);
 
-	s1 = ps_new_subscriber(10, STRLIST("foo.bar S!")); // Get all child sticky messages
+	s1 = ps_new_subscriber(10, STRLIST("foo.bar S")); // Get all child sticky messages
 	assert(ps_waiting(s1) == 2);
 	ps_free_subscriber(s1);
 
-	s1 = ps_new_subscriber(10, STRLIST("foo.bar.baz S!")); // Get all child sticky messages
+	s1 = ps_new_subscriber(10, STRLIST("foo.bar.baz S")); // Get all child sticky messages
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
 
