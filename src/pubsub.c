@@ -54,6 +54,7 @@ struct ps_subscriber_s {
 	ps_queue_t *q;
 	subscriptions_list_t *subs;
 	uint32_t overflow;
+	new_msg_cb_t new_msg_cb;
 };
 
 #ifdef PS_FREE_RTOS
@@ -374,6 +375,10 @@ static int push_subscriber_queue(ps_subscriber_t *su, ps_msg_t *msg) {
 		ps_unref_msg(msg);
 		return -1;
 	}
+	if (su->new_msg_cb != NULL) {
+		(su->new_msg_cb)(su);
+	}
+
 	return 0;
 }
 
@@ -405,6 +410,17 @@ void ps_free_subscriber(ps_subscriber_t *su) {
 	ps_free_queue(su->q);
 	free(su);
 	__sync_sub_and_fetch(&stat_live_subscribers, 1);
+}
+
+void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
+	PORT_LOCK
+	su->new_msg_cb = cb;
+	if (ps_queue_waiting(su->q) > 0) {
+		if (su->new_msg_cb != NULL) {
+			(su->new_msg_cb)(su);
+		}
+	}
+	PORT_UNLOCK
 }
 
 int ps_stats_live_subscribers(void) {

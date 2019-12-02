@@ -6,6 +6,7 @@
 
 #include "pubsub.h"
 
+/* Helper functions */
 static void check_leak(void) {
 	ps_clean_sticky("");
 	assert(ps_stats_live_msg() == 0);
@@ -24,6 +25,17 @@ static void *inc_thread(void *v) {
 	return NULL;
 }
 
+static int new_msg_cb_touch;
+static ps_subscriber_t *new_msg_cb_subscriber;
+
+static void new_msg_cb(ps_subscriber_t *su) {
+	new_msg_cb_touch++;
+	new_msg_cb_subscriber = su;
+}
+
+/* End helper functions*/
+
+/* Test Functions */
 void test_subscriptions(void) {
 	printf("Test subscriptions\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
@@ -219,6 +231,23 @@ void test_overflow(void) {
 	check_leak();
 }
 
+void test_new_msg_cb(void) {
+	printf("Test new msg callback\n");
+
+	new_msg_cb_touch = 0;
+	new_msg_cb_subscriber = NULL;
+
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	PUB_INT("foo.bar", 1);
+	ps_set_new_msg_cb(s1, new_msg_cb);
+	assert(new_msg_cb_touch == 1);
+	PUB_INT("foo.bar", 1);
+	assert(new_msg_cb_touch == 2);
+	assert(ps_waiting(s1) == 2);
+	ps_free_subscriber(s1);
+	check_leak();
+}
+
 void test_call(void) {
 	printf("Test call\n");
 	ps_msg_t *msg = NULL;
@@ -284,6 +313,7 @@ void run_all(void) {
 	test_no_recursive();
 	test_pub_get();
 	test_overflow();
+	test_new_msg_cb();
 	test_call();
 	test_no_return_path();
 	test_topic_prefix_suffix();
