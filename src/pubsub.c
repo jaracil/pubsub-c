@@ -33,6 +33,7 @@ typedef struct ps_queue_s {
 typedef struct subscriber_list_s {
 	ps_subscriber_t *su;
 	bool hidden;
+	bool on_empty;
 	struct subscriber_list_s *next;
 	struct subscriber_list_s *prev;
 } subscriber_list_t;
@@ -458,6 +459,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	char *topic = strdup(topic_orig);
 
 	bool hidden_flag = false;
+	bool on_empty_flag = false;
 	bool no_sticky_flag = false;
 	bool child_sticky_flag = false;
 
@@ -476,6 +478,9 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 			case 'S':
 				child_sticky_flag = true;
 				break;
+			case 'e':
+				on_empty_flag = true;
+				break;
 			}
 			fl_str++;
 		}
@@ -491,6 +496,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	sl = calloc(1, sizeof(*sl));
 	sl->su = su;
 	sl->hidden = hidden_flag;
+	sl->on_empty = on_empty_flag;
 	DL_APPEND(tm->subscribers, sl);
 	subs = calloc(1, sizeof(*subs));
 	subs->tm = tm;
@@ -649,6 +655,9 @@ int ps_publish(ps_msg_t *msg) {
 		}
 		if (tm != NULL) {
 			DL_FOREACH (tm->subscribers, sl) {
+				if (sl->on_empty && ps_waiting(sl->su) != 0) {
+					continue;
+				}
 				if (push_subscriber_queue(sl->su, msg) == 0 && !sl->hidden) {
 					ret++;
 				}

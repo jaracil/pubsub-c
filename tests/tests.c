@@ -176,6 +176,26 @@ void test_no_recursive(void) {
 	check_leak();
 }
 
+void test_on_empty(void) {
+	ps_msg_t *msg;
+	printf("Test on empty\n");
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo e"));
+	PUB_NIL("foo.bar");
+	assert(ps_waiting(s1) == 1);
+	PUB_NIL("foo.bar");
+	assert(ps_waiting(s1) == 1);
+	msg = ps_get(s1, 10);
+	assert(IS_NIL(msg));
+	ps_unref_msg(msg);
+	assert(ps_waiting(s1) == 0);
+	PUB_NIL("foo.bar");
+	assert(ps_waiting(s1) == 1);
+	PUB_NIL("foo.bar");
+	assert(ps_waiting(s1) == 1);
+	ps_free_subscriber(s1);
+	check_leak();
+}
+
 void test_pub_get(void) {
 	printf("Test pub->get\n");
 	ps_msg_t *msg;
@@ -311,6 +331,7 @@ void run_all(void) {
 	test_no_sticky_flag();
 	test_child_sticky_flag();
 	test_no_recursive();
+	test_on_empty();
 	test_pub_get();
 	test_overflow();
 	test_new_msg_cb();
