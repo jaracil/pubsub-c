@@ -3,7 +3,7 @@
 ## Publish and Subscribe Overview
 
 [![Licence](https://img.shields.io/github/license/jaracil/pubsub-c)](https://github.com/jaracil/pubsub-c/blob/master/LICENSE)
-[![Actions Status](https://github.com/MihaiLupoiu/pubsub-c/workflows/build/badge.svg?branch=master)](https://github.com/MihaiLupoiu/pubsub-c/actions)
+[![Actions Status](https://github.com/jaracil/pubsub-c/workflows/build/badge.svg?branch=master)](https://github.com/jaracil/pubsub-c/actions)
 
 Pubsub utilizes a Publish/Subscribe paradigm model for real-time data streaming between several decoupled components in a application by using string topics separated by dots E.g. "system.status.ready".
 
