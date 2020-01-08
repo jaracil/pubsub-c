@@ -2,6 +2,9 @@
 
 ## Publish and Subscribe Overview
 
+[![Licence](https://img.shields.io/github/license/jaracil/pubsub-c)](https://github.com/jaracil/pubsub-c/blob/master/LICENSE)
+[![Actions Status](https://github.com/jaracil/pubsub-c/workflows/build/badge.svg?branch=master)](https://github.com/jaracil/pubsub-c/actions)
+
 Pubsub utilizes a Publish/Subscribe paradigm model for real-time data streaming between several decoupled components in a application by using string topics separated by dots E.g. "system.status.ready".
 
 For example, a instances can publish it's temperature value in `<instance_name>.evt.temp` topic. This is useful when several other instances uses another instance data to process (for example one can make push the data to a server, another one can push it using Bluetooth or store it and calculate the median temperature). The instances subscribe to that topic and waits for the data to be received.
