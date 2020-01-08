@@ -1,4 +1,4 @@
-name: pubsub-c
+name: build
 
 on:
   push:
