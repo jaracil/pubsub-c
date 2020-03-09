@@ -275,6 +275,7 @@ ps_msg_t *ps_dup_msg(ps_msg_t const *msg_orig) {
 	} else if (IS_BUF(msg_orig)) {
 		msg->buf_val.ptr = malloc(msg_orig->buf_val.sz);
 		memcpy(msg->buf_val.ptr, msg_orig->buf_val.ptr, msg_orig->buf_val.sz);
+		msg->buf_val.dtor = free;
 	} else if (IS_ERR(msg_orig)) {
 		if (msg_orig->err_val.desc != NULL) {
 			msg->err_val.desc = strdup(msg_orig->err_val.desc);
