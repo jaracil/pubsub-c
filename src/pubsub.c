@@ -680,6 +680,25 @@ int ps_publish(ps_msg_t *msg) {
 	return ret;
 }
 
+int ps_subs_count(char *topic) {
+	if (topic == NULL || strlen(topic) == 0)
+		return 0;
+	topic_map_t *tm = NULL;
+	subscriber_list_t *sl = NULL;
+	size_t count = 0;
+
+	PORT_LOCK
+	tm = fetch_topic(topic);
+	if (tm != NULL) {
+		DL_FOREACH (tm->subscribers, sl) {
+			if (!sl->hidden)
+				++(count);
+		}
+	}
+	PORT_UNLOCK
+	return count;
+}
+
 ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout) {
 	ps_msg_t *ret_msg = NULL;
 	char rtopic[32] = {0};
