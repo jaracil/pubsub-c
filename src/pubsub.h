@@ -243,6 +243,14 @@ int ps_flush(ps_subscriber_t *su);
 int ps_num_subs(ps_subscriber_t *su);
 
 /**
+ * @brief ps_subs_count gives the number of subscriptors of a topic
+ *
+ * @param topic string path to count subcriptors
+ * @return the number of subcriptors
+ */
+int ps_subs_count(char *topic);
+
+/**
  * @brief ps_waiting gives the number of messages pending to read from subscriber
  *
  * @param su subscribe instance

@@ -62,6 +62,25 @@ void test_hidden_subscription(void) {
 	check_leak();
 }
 
+void test_subs_count(void) {
+	printf("Test subs_count\n");
+	assert(ps_subs_count(NULL) == 0);
+	assert(ps_subs_count("") == 0);
+	assert(ps_subs_count("foo") == 0);
+	assert(ps_subs_count("foo.bar") == 0);
+	assert(ps_subs_count("bar") == 0);
+	assert(ps_subs_count("baz") == 0);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
+	assert(ps_subs_count("foo") == 1);
+	assert(ps_subs_count("foo.bar") == 2);
+	assert(ps_subs_count("bar") == 0);
+	assert(ps_subs_count("baz") == 1);
+	ps_free_subscriber(s1);
+	ps_free_subscriber(s2);
+	check_leak();
+}
+
 void test_subscribe_many(void) {
 	printf("Test subscribe/unsubscribe many\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, NULL);
@@ -324,6 +343,7 @@ void run_all(void) {
 	test_subscriptions();
 	test_hidden_subscription();
 	test_subscribe_many();
+	test_subs_count();
 	test_publish();
 	test_sticky();
 	test_clean_sticky();

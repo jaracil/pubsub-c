@@ -680,6 +680,37 @@ int ps_publish(ps_msg_t *msg) {
 	return ret;
 }
 
+int ps_subs_count(char *topic_) {
+	if (topic_ == NULL || strlen(topic_) == 0)
+		return 0;
+	char *topic = strdup(topic_);
+
+	topic_map_t *tm = NULL;
+	subscriber_list_t *sl = NULL;
+	size_t count = 0;
+
+	PORT_LOCK
+	while (strlen(topic) > 0) {
+		tm = fetch_topic(topic);
+		if (tm != NULL) {
+			DL_FOREACH (tm->subscribers, sl) {
+				if (!sl->hidden)
+					count++;
+			}
+		}
+
+		for (size_t n = strlen(topic); n > 0; n--) {
+			if (topic[n - 1] == '.') {
+				topic[n - 1] = 0;
+				break;
+			}
+			topic[n - 1] = 0;
+		}
+	}
+	PORT_UNLOCK
+	return count;
+}
+
 ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout) {
 	ps_msg_t *ret_msg = NULL;
 	char rtopic[32] = {0};
