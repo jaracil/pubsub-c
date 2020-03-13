@@ -695,7 +695,7 @@ int ps_subs_count(char *topic_) {
 		if (tm != NULL) {
 			DL_FOREACH (tm->subscribers, sl) {
 				if (!sl->hidden)
-					++(count);
+					count++;
 			}
 		}
 
