@@ -33,6 +33,8 @@
 enum msg_flags {
 	FL_STICKY = 1 << 0,
 	FL_NONRECURSIVE = 1 << 1,
+	FL_EXTERNAL = 1 << 2,
+	FL_UNTRUSTED = 1 << 3,
 	INT_TYP = 0x00000100u,
 	DBL_TYP = 0x00000200u,
 	PTR_TYP = 0x00000300u,
@@ -374,3 +376,10 @@ void ps_clean_sticky(const char *prefix);
 #define IS_BUF(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BUF_TYP)
 #define IS_ERR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == ERR_TYP)
 #define IS_NIL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == NIL_TYP)
+
+/**
+ * @brief IS_EXTERNAL IS_UNTRUSTED are macros for simplifying the way of checking the source of
+ * message received
+ */
+#define IS_EXTERNAL(m) ((m) != NULL && ((m)->flags & FL_EXTERNAL))
+#define IS_UNTRUSTED(m) ((m) != NULL && ((m)->flags & FL_UNTRUSTED))
