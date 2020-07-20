@@ -707,6 +707,7 @@ int ps_subs_count(char *topic_) {
 			topic[n - 1] = 0;
 		}
 	}
+	free(topic);
 	PORT_UNLOCK
 	return count;
 }
