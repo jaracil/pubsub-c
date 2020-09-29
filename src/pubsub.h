@@ -54,7 +54,7 @@ enum msg_flags {
 	MSK_ENC = 0x000F0000u
 };
 
-typedef const char *strlist_t[];
+typedef const char *const strlist_t[];
 
 /**
  * @brief Helper macro to make a NULL terminated string array
@@ -166,6 +166,9 @@ ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
  * @param s subscriber to free.
  */
 void ps_free_subscriber(ps_subscriber_t *s);
+
+void ps_subscriber_user_data_set(ps_subscriber_t *s, void *userData);
+void *ps_subscriber_user_data(ps_subscriber_t *s);
 
 /**
  * @brief ps_get get message from subscribers

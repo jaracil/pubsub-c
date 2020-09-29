@@ -56,6 +56,7 @@ struct ps_subscriber_s {
 	subscriptions_list_t *subs;
 	uint32_t overflow;
 	new_msg_cb_t new_msg_cb;
+	void *userData;
 };
 
 #ifdef PS_FREE_RTOS
@@ -107,7 +108,7 @@ static int deadline_ms(int64_t ms, struct timespec *tout) {
 }
 #endif
 
-ps_queue_t *ps_new_queue(size_t sz) {
+static ps_queue_t *ps_new_queue(size_t sz) {
 
 	ps_queue_t *q = calloc(1, sizeof(ps_queue_t));
 #ifdef PS_FREE_RTOS
@@ -130,7 +131,7 @@ ps_queue_t *ps_new_queue(size_t sz) {
 	return q;
 }
 
-void ps_free_queue(ps_queue_t *q) {
+static void ps_free_queue(ps_queue_t *q) {
 #ifdef PS_FREE_RTOS
 	vQueueDelete(q->queue);
 #else
@@ -141,7 +142,7 @@ void ps_free_queue(ps_queue_t *q) {
 	free(q);
 }
 
-int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
+static int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
 
 #ifdef PS_FREE_RTOS
 	if (xQueueSend(q->queue, &msg, 0) != pdTRUE) {
@@ -167,7 +168,7 @@ exit_fn:
 #endif
 }
 
-ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
+static ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
 	ps_msg_t *msg = NULL;
 
 #ifdef PS_FREE_RTOS
@@ -209,7 +210,7 @@ exit_fn:
 #endif
 }
 
-size_t ps_queue_waiting(ps_queue_t *q) {
+static size_t ps_queue_waiting(ps_queue_t *q) {
 #ifdef PS_FREE_RTOS
 	return uxQueueMessagesWaiting(q->queue);
 #else
@@ -412,6 +413,13 @@ void ps_free_subscriber(ps_subscriber_t *su) {
 	ps_free_queue(su->q);
 	free(su);
 	__sync_sub_and_fetch(&stat_live_subscribers, 1);
+}
+
+void ps_subscriber_user_data_set(ps_subscriber_t *s, void *userData) {
+	s->userData = userData;
+}
+void *ps_subscriber_user_data(ps_subscriber_t *s) {
+	return s->userData;
 }
 
 void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
