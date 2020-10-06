@@ -398,7 +398,7 @@ static void push_child_sticky(ps_subscriber_t *su, const char *prefix) {
 	}
 }
 
-ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs) {
+ps_subscriber_t *ps_new_subscriber(size_t queue_size, const strlist_t subs) {
 	ps_subscriber_t *su = calloc(1, sizeof(ps_subscriber_t));
 	su->q = ps_new_queue(queue_size);
 	su->overflow = false;
@@ -447,7 +447,7 @@ int ps_flush(ps_subscriber_t *su) {
 	return flushed;
 }
 
-int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs) {
+int ps_subscribe_many(ps_subscriber_t *su, const strlist_t subs) {
 	int n = 0;
 	if (subs != NULL) {
 		size_t idx = 0;
@@ -557,7 +557,7 @@ exit_fn:
 	return ret;
 }
 
-int ps_unsubscribe_many(ps_subscriber_t *su, strlist_t subs) {
+int ps_unsubscribe_many(ps_subscriber_t *su, const strlist_t subs) {
 	int n = 0;
 	if (subs != NULL) {
 		size_t idx = 0;
