@@ -54,13 +54,13 @@ enum msg_flags {
 	MSK_ENC = 0x000F0000u
 };
 
-typedef const char *strlist_t[];
+typedef const char *const strlist_t[];
 
 /**
  * @brief Helper macro to make a NULL terminated string array
  */
 #define STRLIST(...)                                                                                                   \
-	(strlist_t) {                                                                                                      \
+	(const strlist_t) {                                                                                                \
 		__VA_ARGS__, NULL                                                                                              \
 	}
 
@@ -158,7 +158,7 @@ void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic);
  * @param subs string paths to subscribe for messages (see STRLIST macro)
  * @return ps_subscriber_t*
  */
-ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
+ps_subscriber_t *ps_new_subscriber(size_t queue_size, const strlist_t subs);
 
 /**
  * @brief ps_free_subscriber frees all data from the subscriber, including message queue.
@@ -166,6 +166,9 @@ ps_subscriber_t *ps_new_subscriber(size_t queue_size, strlist_t subs);
  * @param s subscriber to free.
  */
 void ps_free_subscriber(ps_subscriber_t *s);
+
+void ps_subscriber_user_data_set(ps_subscriber_t *s, void *userData);
+void *ps_subscriber_user_data(ps_subscriber_t *s);
 
 /**
  * @brief ps_get get message from subscribers
@@ -192,7 +195,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic);
  * @param subs strings with the paths to subscribe
  * @return the number of unsubscribed topics.
  */
-int ps_subscribe_many(ps_subscriber_t *su, strlist_t subs);
+int ps_subscribe_many(ps_subscriber_t *su, const strlist_t subs);
 
 /**
  * @brief ps_unsubscribe removes one topic from the subscribe instance
@@ -210,7 +213,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic);
  * @param subs strings with the paths to subscribe (see STRLIST macro)
  * @return the number of unsubscribed topics
  */
-int ps_unsubscribe_many(ps_subscriber_t *su, strlist_t subs);
+int ps_unsubscribe_many(ps_subscriber_t *su, const strlist_t subs);
 
 /**
  * @brief ps_unsubscribe_all removes all topic from the subscribe instance
