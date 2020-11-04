@@ -222,19 +222,24 @@ static size_t ps_queue_waiting(ps_queue_t *q) {
 #endif
 }
 
-ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
-	if (topic == NULL)
-		return NULL;
+static void ps_msg_free_value(ps_msg_t *msg) {
+	if (IS_STR(msg)) {
+		free(msg->str_val);
+	} else if (IS_BUF(msg)) {
+		if (msg->buf_val.ptr && msg->buf_val.dtor) {
+			msg->buf_val.dtor(msg->buf_val.ptr);
+		}
+	} else if (IS_ERR(msg)) {
+		free(msg->err_val.desc);
+	}
 
-	ps_msg_t *msg = calloc(1, sizeof(ps_msg_t));
-	va_list args;
-	va_start(args, flags);
+	msg->flags = (msg->flags & ~MSK_VALUE) | NIL_TYP;
+}
 
-	msg->_ref = 1;
-	msg->flags = flags;
-	msg->topic = strdup(topic);
-	msg->rtopic = NULL;
+static void ps_msg_set_vvalue(ps_msg_t *msg, uint32_t flags, va_list args) {
+	ps_msg_free_value(msg);
 
+	msg->flags = (msg->flags & ~MSK_VALUE) | (flags & MSK_VALUE);
 	if (IS_INT(msg)) {
 		msg->int_val = (va_arg(args, int64_t));
 	} else if (IS_DBL(msg)) {
@@ -253,6 +258,26 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
 		msg->err_val.id = (va_arg(args, int));
 		msg->err_val.desc = strdup((va_arg(args, char *)));
 	}
+}
+
+ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
+	if (topic == NULL)
+		return NULL;
+
+	ps_msg_t *msg = calloc(1, sizeof(ps_msg_t));
+
+	msg->_ref = 1;
+	msg->flags = flags;
+	msg->topic = strdup(topic);
+	msg->rtopic = NULL;
+
+	va_list args;
+	va_start(args, flags);
+
+	ps_msg_set_vvalue(msg, flags, args);
+
+	va_end(args);
+
 	__sync_add_and_fetch(&stat_live_msg, 1);
 	return msg;
 }
@@ -306,6 +331,45 @@ void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic) {
 	}
 }
 
+void ps_msg_set_value(ps_msg_t *msg, uint32_t flags, ...) {
+	va_list args;
+	va_start(args, flags);
+
+	ps_msg_set_vvalue(msg, flags, args);
+
+	va_end(args);
+}
+
+int64_t ps_msg_value_int(const ps_msg_t *msg) {
+	if (IS_INT(msg))
+		return msg->int_val;
+	else if (IS_DBL(msg))
+		return msg->dbl_val;
+	else if (IS_BOOL(msg))
+		return msg->bool_val;
+	return 0;
+}
+
+double ps_msg_value_double(const ps_msg_t *msg) {
+	if (IS_INT(msg))
+		return msg->int_val;
+	else if (IS_DBL(msg))
+		return msg->dbl_val;
+	else if (IS_BOOL(msg))
+		return msg->bool_val;
+	return 0;
+}
+
+bool ps_msg_value_bool(const ps_msg_t *msg) {
+	if (IS_INT(msg))
+		return msg->int_val != 0;
+	else if (IS_DBL(msg))
+		return msg->dbl_val != 0.0;
+	else if (IS_BOOL(msg))
+		return msg->bool_val;
+	return false;
+}
+
 ps_msg_t *ps_ref_msg(ps_msg_t *msg) {
 	if (msg != NULL)
 		__sync_add_and_fetch(&msg->_ref, 1);
@@ -320,15 +384,8 @@ void ps_unref_msg(ps_msg_t *msg) {
 		if (msg->rtopic != NULL) {
 			free(msg->rtopic);
 		}
-		if (IS_STR(msg)) {
-			free(msg->str_val);
-		} else if (IS_BUF(msg)) {
-			if (msg->buf_val.dtor != NULL) {
-				msg->buf_val.dtor(msg->buf_val.ptr);
-			}
-		} else if (IS_ERR(msg)) {
-			free(msg->err_val.desc);
-		}
+		ps_msg_free_value(msg);
+
 		free(msg);
 		__sync_sub_and_fetch(&stat_live_msg, 1);
 	}

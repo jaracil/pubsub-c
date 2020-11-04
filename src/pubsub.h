@@ -35,6 +35,7 @@ enum msg_flags {
 	FL_NONRECURSIVE = 1 << 1,
 	FL_EXTERNAL = 1 << 2,
 	FL_UNTRUSTED = 1 << 3,
+	MSK_FL = 0x000000FFu,
 	INT_TYP = 0x00000100u,
 	DBL_TYP = 0x00000200u,
 	PTR_TYP = 0x00000300u,
@@ -51,7 +52,8 @@ enum msg_flags {
 	YAML_ENC = 0x00040000u,
 	PROTOBUF_ENC = 0x00050000u,
 	XML_ENC = 0x00060000u,
-	MSK_ENC = 0x000F0000u
+	MSK_ENC = 0x000F0000u,
+	MSK_VALUE = MSK_TYP | MSK_ENC
 };
 
 typedef const char *const strlist_t[];
@@ -150,6 +152,103 @@ void ps_msg_set_topic(ps_msg_t *msg, const char *topic);
  * @param rtopic string with the path to reply
  */
 void ps_msg_set_rtopic(ps_msg_t *msg, const char *rtopic);
+
+/**
+ * @brief ps_msg_set_value stores a new value in a message, freeing
+ * the previous stored value.
+ *
+ * @param msg message to set the reply topic
+ * @param rtopic string with the path to reply
+ */
+void ps_msg_set_value(ps_msg_t *msg, uint32_t flags, ...);
+
+/**
+ * @brief ps_msg_set_value_int shorthand for storing int values.
+ *
+ * @param msg message to set the reply topic
+ * @param value value
+ */
+static inline void ps_msg_set_value_int(ps_msg_t *msg, int64_t value) {
+	ps_msg_set_value(msg, INT_TYP, value);
+}
+
+/**
+ * @brief ps_msg_set_value_double shorthand for storing double values.
+ *
+ * @param msg message to set the reply topic
+ * @param value value
+ */
+static inline void ps_msg_set_value_double(ps_msg_t *msg, double value) {
+	ps_msg_set_value(msg, DBL_TYP, value);
+}
+
+/**
+ * @brief ps_msg_set_value_string shorthand for storing string values.
+ *
+ * @param msg message to set the reply topic
+ * @param value value
+ */
+static inline void ps_msg_set_value_string(ps_msg_t *msg, const char *value) {
+	ps_msg_set_value(msg, STR_TYP, value);
+}
+
+/**
+ * @brief ps_msg_set_value_boolean shorthand for storing bool values.
+ *
+ * @param msg message to set the reply topic
+ * @param value value
+ */
+static inline void ps_msg_set_value_boolean(ps_msg_t *msg, bool value) {
+	ps_msg_set_value(msg, BOOL_TYP, value);
+}
+
+/**
+ * @brief ps_msg_set_value_nil shorthand for storing nil values.
+ *
+ * @param msg message to set the reply topic
+ */
+static inline void ps_msg_set_value_nil(ps_msg_t *msg) {
+	ps_msg_set_value(msg, NIL_TYP);
+}
+
+/**
+ * @brief ps_msg_set_value_buffer shorthand for storing buffer values.
+ *
+ * @param msg message to set the reply topic
+ * @param buf buffer
+ * @param sz buffer size
+ * @param dtor buffer destructor
+ * @param encoding buffer encoding, masked with MSK_ENC
+ */
+static inline void ps_msg_set_value_buffer(ps_msg_t *msg, const void *buf, size_t sz, ps_dtor_t dtor,
+                                           uint32_t encoding) {
+	ps_msg_set_value(msg, BUF_TYP | (encoding & MSK_ENC), buf, sz, dtor);
+}
+
+/**
+ * @brief ps_msg_value_int coerces the value of the msg to an integer.
+ * Performs the conversion from double and boolean to int.
+ * Succeeds if IS_NUMBER(msg)
+ *
+ * @param msg message to set the reply topic
+ */
+int64_t ps_msg_value_int(const ps_msg_t *msg);
+/**
+ * @brief ps_msg_value_double coerces the value of the msg to a double.
+ * Performs the conversion from int and boolean to double.
+ * Succeeds if IS_NUMBER(msg)
+ *
+ * @param msg message to set the reply topic
+ */
+double ps_msg_value_double(const ps_msg_t *msg);
+/**
+ * @brief ps_msg_value_bool coerces the value of the msg to a boolean.
+ * Performs the conversion from int and double to boolean.
+ * Succeeds if IS_NUMBER(msg)
+ *
+ * @param msg message to set the reply topic
+ */
+bool ps_msg_value_bool(const ps_msg_t *msg);
 
 /**
  * @brief ps_new_subscriber create a new subscriber to a path.
@@ -373,9 +472,10 @@ void ps_clean_sticky(const char *prefix);
  */
 #define IS_INT(m) ((m) != NULL && ((m)->flags & MSK_TYP) == INT_TYP)
 #define IS_DBL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == DBL_TYP)
+#define IS_BOOL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BOOL_TYP)
+#define IS_NUMBER(m) (IS_INT(m) || IS_DBL(m) || IS_BOOL(m))
 #define IS_PTR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == PTR_TYP)
 #define IS_STR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == STR_TYP)
-#define IS_BOOL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BOOL_TYP)
 #define IS_BUF(m) ((m) != NULL && ((m)->flags & MSK_TYP) == BUF_TYP)
 #define IS_ERR(m) ((m) != NULL && ((m)->flags & MSK_TYP) == ERR_TYP)
 #define IS_NIL(m) ((m) != NULL && ((m)->flags & MSK_TYP) == NIL_TYP)
