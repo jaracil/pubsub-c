@@ -215,6 +215,19 @@ void test_on_empty(void) {
 	check_leak();
 }
 
+void test_unsub_on_empty(void) {
+	printf("Test unsub on empty\n");
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo e", "bar e"));
+	ps_unsubscribe(s1, "foo");
+	PUB_NIL("foo.bar");
+	assert(ps_waiting(s1) == 0);
+	ps_unsubscribe(s1, "bar e");
+	PUB_NIL("bar");
+	assert(ps_waiting(s1) == 0);
+	ps_free_subscriber(s1);
+	check_leak();
+}
+
 void test_pub_get(void) {
 	printf("Test pub->get\n");
 	ps_msg_t *msg;
@@ -352,6 +365,7 @@ void run_all(void) {
 	test_child_sticky_flag();
 	test_no_recursive();
 	test_on_empty();
+	test_unsub_on_empty();
 	test_pub_get();
 	test_overflow();
 	test_new_msg_cb();

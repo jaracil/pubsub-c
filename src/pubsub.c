@@ -583,11 +583,17 @@ exit_fn:
 	return ret;
 }
 
-int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
+int ps_unsubscribe(ps_subscriber_t *su, const char *otopic) {
 	int ret = 0;
 	topic_map_t *tm;
 	subscriber_list_t *sl;
 	subscriptions_list_t *subs;
+
+	char *topic = strdup(otopic);
+	char *fl_str = strchr(topic, ' ');
+	if (fl_str != NULL) {
+		*fl_str = '\0';
+	}
 
 	PORT_LOCK
 	tm = fetch_topic(topic);
@@ -611,6 +617,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *topic) {
 
 exit_fn:
 	PORT_UNLOCK
+	free(topic);
 	return ret;
 }
 
