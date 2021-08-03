@@ -3,7 +3,8 @@ build
 sdkconfig
 *.old
 *~
-*.out
+*.out*
 *.gc*
+
 /docs/xml
 /docs/html

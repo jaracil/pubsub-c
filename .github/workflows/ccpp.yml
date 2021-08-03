@@ -20,7 +20,7 @@ jobs:
       run: cd tests && make all
     - name: Run tests
       run: cd tests && ./tests.out
-    - name: Get Covarage Tests
+    - name: Get Coverage Tests
       run: cd tests && gcov ./tests.out
-    - name: Get Covarage Pubsub
+    - name: Get Coverage Pubsub
       run: cd tests && gcov pubsub.c
