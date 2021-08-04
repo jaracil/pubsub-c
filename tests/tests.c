@@ -40,7 +40,10 @@ static void new_msg_cb(ps_subscriber_t *su) {
 void test_subscriptions(void) {
 	printf("Test subscriptions\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	assert(ps_subscribe(s1, "foo.bar") == -1);
+	assert(ps_unsubscribe(s1, "foo.baz") == -1);
 	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
+	assert(ps_unsubscribe(s1, "foo") == -1);
 	assert(ps_num_subs(s1) == 1);
 	assert(ps_num_subs(s2) == 2);
 	ps_unsubscribe(s2, "baz");
@@ -238,6 +241,7 @@ void test_pub_get(void) {
 	PUB_STR("foo.bar", "Hello");
 	PUB_ERR("foo.bar", -1, "Bad result");
 	PUB_BUF("foo.bar", malloc(10), 10, free);
+	PUB_PTR("foo.bar", s1);
 
 	msg = ps_get(s1, 10);
 	assert(IS_INT(msg) && msg->int_val == 1);
@@ -253,6 +257,9 @@ void test_pub_get(void) {
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
 	assert(IS_BUF(msg) && (msg->buf_val.sz == 10));
+	ps_unref_msg(msg);
+	msg = ps_get(s1, 10);
+	assert(IS_PTR(msg) && (msg->ptr_val == s1));
 	ps_unref_msg(msg);
 
 	msg = ps_get(s1, 1);
@@ -336,7 +343,11 @@ void test_no_return_path(void) {
 
 void test_topic_prefix_suffix(void) {
 	printf("Test has_topic, has_topic_prefix, has_topic_suffix\n");
-	ps_msg_t *msg;
+	ps_msg_t *msg = NULL;
+	assert(!ps_has_topic(msg, "foo.bar"));
+	assert(!ps_has_topic_prefix(msg, "foo.bar"));
+	assert(!ps_has_topic_suffix(msg, "foo.bar"));
+
 	ps_subscriber_t *s1 = ps_new_subscriber(2, STRLIST("foo.bar"));
 	PUB_NIL("foo.bar");
 	msg = ps_get(s1, 10);
@@ -347,9 +358,113 @@ void test_topic_prefix_suffix(void) {
 	assert(!ps_has_topic(msg, "foo.baz"));
 	assert(!ps_has_topic_prefix(msg, "baz."));
 	assert(!ps_has_topic_suffix(msg, ".baz"));
+	assert(!ps_has_topic_suffix(msg, "this.is.a.very.large.topic"));
+
+	ps_msg_set_topic(msg, "foo.old");
+	ps_msg_set_topic(msg, "foo.new");
+	assert(ps_has_topic(msg, "foo.new"));
+
+	ps_msg_set_rtopic(msg, "foo.old");
+	ps_msg_set_rtopic(msg, "foo.new");
+	assert(strcmp(msg->rtopic, "foo.new") == 0);
 
 	ps_unref_msg(msg);
 	ps_free_subscriber(s1);
+	check_leak();
+}
+
+void test_msg_getset(void) {
+	printf("Test msg getset values\n");
+	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST("foo"));
+	ps_msg_t *msg = NULL;
+
+	PUB_INT("foo", 42);
+	msg = ps_get(su, 1000);
+	assert(ps_msg_value_int(msg) == 42);
+	assert(ps_msg_value_double(msg) == 42);
+	assert(ps_msg_value_bool(msg));
+	ps_unref_msg(msg);
+
+	PUB_DBL("foo", 123);
+	msg = ps_get(su, 1000);
+	assert(ps_msg_value_int(msg) == 123);
+	assert(ps_msg_value_double(msg) == 123);
+	assert(ps_msg_value_bool(msg));
+	ps_unref_msg(msg);
+
+	PUB_BOOL("foo", true);
+	msg = ps_get(su, 1000);
+	assert(ps_msg_value_int(msg) == 1);
+	assert(ps_msg_value_double(msg) == 1);
+	assert(ps_msg_value_bool(msg));
+	ps_unref_msg(msg);
+
+	PUB_NIL("foo");
+	msg = ps_get(su, 1000);
+	assert(ps_msg_value_int(msg) == 0);
+	assert(ps_msg_value_double(msg) == 0);
+	assert(!ps_msg_value_bool(msg));
+
+	ps_msg_set_value_int(msg, 987);
+	assert(ps_msg_value_int(msg) == 987);
+	ps_unref_msg(msg);
+	msg = NULL;
+	ps_free_subscriber(su);
+	check_leak();
+}
+
+void test_dup_msg(void) {
+	printf("Test dup msg\n");
+	ps_msg_t *msg = NULL;
+	ps_msg_t *dup = NULL;
+
+	char str[] = "bar";
+	msg = ps_new_msg("foo", STR_TYP, str);
+	ps_msg_set_rtopic(msg, "baz");
+	int live_msg = ps_stats_live_msg();
+	dup = ps_dup_msg(msg);
+	assert(ps_stats_live_msg() == live_msg + 1);
+	assert(msg->_ref == 1);
+	assert(dup->_ref == 1);
+	assert(strcmp(msg->topic, dup->topic) == 0);
+	assert(strcmp(msg->rtopic, dup->rtopic) == 0);
+	assert(msg->flags == dup->flags);
+	assert(dup->str_val != msg->str_val);
+	assert(strcmp(msg->str_val, "bar") == 0);
+	ps_unref_msg(msg);
+	ps_unref_msg(dup);
+
+	uint8_t *buf = calloc(3, sizeof(uint8_t));
+	buf[0] = 0x42;
+	msg = ps_new_msg("foo", BUF_TYP, (void *) buf, 3, free);
+	ps_msg_set_rtopic(msg, "baz");
+	dup = ps_dup_msg(msg);
+	assert(dup->buf_val.ptr != msg->buf_val.ptr);
+	assert(((uint8_t *) dup->buf_val.ptr)[0] == 0x42);
+	assert(dup->buf_val.sz == 3);
+	assert(dup->buf_val.dtor == free);
+	ps_unref_msg(msg);
+	ps_unref_msg(dup);
+
+	char err[] = "error";
+	msg = ps_new_msg("foo", ERR_TYP, 42, err);
+	ps_msg_set_rtopic(msg, "baz");
+	dup = ps_dup_msg(msg);
+	assert(dup->err_val.desc != msg->err_val.desc);
+	assert(strcmp(dup->err_val.desc, msg->err_val.desc) == 0);
+	assert(dup->err_val.id == 42);
+	ps_unref_msg(msg);
+	ps_unref_msg(dup);
+	check_leak();
+}
+
+void test_subscriber_userdata(void) {
+	printf("Test userdata\n");
+	int foo = 42;
+	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST("foo"));
+	ps_subscriber_user_data_set(su, &foo);
+	assert(ps_subscriber_user_data(su) == &foo);
+	ps_free_subscriber(su);
 	check_leak();
 }
 
@@ -373,6 +488,9 @@ void run_all(void) {
 	test_call();
 	test_no_return_path();
 	test_topic_prefix_suffix();
+	test_msg_getset();
+	test_dup_msg();
+	test_subscriber_userdata();
 	printf("All tests passed!\n");
 }
 
