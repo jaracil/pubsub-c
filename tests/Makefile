@@ -1,5 +1,5 @@
 all:
-	gcc -Wall -fprofile-arcs -ftest-coverage  tests.c ../src/pubsub.c -I../src -lpthread -o tests.out
+	gcc -g -O0 -Wall -Wextra -Wshadow -Wpedantic -fprofile-arcs -ftest-coverage  tests.c ../src/pubsub.c -I../src -lpthread -o tests.out
 
 clean:
 	rm *.out
@@ -17,4 +17,4 @@ example:
 	gcc -Wall example.c ../src/pubsub.c -I../src -lpthread -o example.out
 	
 benchmark:
-	gcc -O0 benchmark.c ../src/pubsub.c -I../src -lpthread -lm -o benchmark.out
+	gcc -Wall -O0 benchmark.c ../src/pubsub.c -I../src -lpthread -lm -o benchmark.out

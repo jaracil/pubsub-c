@@ -14,6 +14,7 @@
 #include "freertos/semphr.h"
 #else
 #include <pthread.h>
+#include <semaphore.h>
 #endif
 
 typedef struct ps_queue_s {
@@ -26,7 +27,7 @@ typedef struct ps_queue_s {
 	size_t head;
 	size_t tail;
 	pthread_mutex_t mux;
-	pthread_cond_t not_empty;
+	sem_t not_empty;
 #endif
 } ps_queue_t;
 
@@ -96,7 +97,7 @@ static int deadline_ms(int64_t ms, struct timespec *tout) {
 	tout->tv_sec = tv.tv_sec;
 	tout->tv_nsec = tv.tv_usec * 1000;
 #else
-	clock_gettime(CLOCK_MONOTONIC, tout);
+	clock_gettime(CLOCK_REALTIME, tout);
 #endif
 	tout->tv_sec += (ms / 1000);
 	tout->tv_nsec += ((ms % 1000) * 1000000);
@@ -117,16 +118,8 @@ static ps_queue_t *ps_new_queue(size_t sz) {
 	q->size = sz;
 	q->messages = calloc(sz, sizeof(void *));
 	pthread_mutex_init(&q->mux, NULL);
+	sem_init(&q->not_empty, 0, 0);
 
-#ifdef PS_USE_GETTIMEOFDAY
-	pthread_cond_init(&q->not_empty, NULL);
-#else
-	pthread_condattr_t cond_attr;
-	pthread_condattr_init(&cond_attr);
-	pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
-	pthread_cond_init(&q->not_empty, &cond_attr);
-	pthread_condattr_destroy(&cond_attr);
-#endif
 #endif
 	return q;
 }
@@ -137,7 +130,7 @@ static void ps_free_queue(ps_queue_t *q) {
 #else
 	free(q->messages);
 	pthread_mutex_destroy(&q->mux);
-	pthread_cond_destroy(&q->not_empty);
+	sem_destroy(&q->not_empty);
 #endif
 	free(q);
 }
@@ -160,7 +153,7 @@ static int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
 	if (++q->head >= q->size)
 		q->head = 0;
 	q->count++;
-	pthread_cond_signal(&q->not_empty);
+	sem_post(&q->not_empty);
 
 exit_fn:
 	pthread_mutex_unlock(&q->mux);
@@ -181,31 +174,27 @@ static ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
 	return msg;
 
 #else
+
 	struct timespec tout = {0};
-	bool init_tout = false;
+	int ret = -1;
+
+	if (timeout < 0) {
+		ret = sem_wait(&q->not_empty);
+	} else {
+		deadline_ms(timeout, &tout);
+		ret = sem_timedwait(&q->not_empty, &tout);
+	}
+
+	if (ret < 0)
+		return NULL;
 
 	pthread_mutex_lock(&q->mux);
-	while (q->count == 0) {
-		if (timeout == 0) {
-			goto exit_fn;
-		} else if (timeout < 0) {
-			pthread_cond_wait(&q->not_empty, &q->mux);
-		} else {
-			if (!init_tout) {
-				init_tout = true;
-				deadline_ms(timeout, &tout);
-			}
-			if (pthread_cond_timedwait(&q->not_empty, &q->mux, &tout) != 0)
-				goto exit_fn;
-		}
-	}
 	msg = q->messages[q->tail];
 	if (++q->tail >= q->size)
 		q->tail = 0;
 	q->count--;
-
-exit_fn:
 	pthread_mutex_unlock(&q->mux);
+
 	return msg;
 #endif
 }

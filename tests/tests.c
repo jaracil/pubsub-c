@@ -14,6 +14,7 @@ static void check_leak(void) {
 }
 
 static void *inc_thread(void *v) {
+	(void) v; // unused
 	ps_subscriber_t *s = ps_new_subscriber(10, STRLIST("fun.inc"));
 	PUB_BOOL_FL("thread.ready", true, FL_STICKY);
 	ps_msg_t *msg = ps_get(s, 5000);
