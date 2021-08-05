@@ -105,6 +105,11 @@ typedef void (*new_msg_cb_t)(ps_subscriber_t *);
 void ps_init(void);
 
 /**
+ * @brief ps_init deinitializes the publish/subscribe internal context.
+ */
+void ps_deinit(void);
+
+/**
  * @brief ps_new_msg generic method to create a new message to be published
  *
  * @param topic string path where the message is published
@@ -431,13 +436,13 @@ void ps_clean_sticky(const char *prefix);
  * @brief PUB_INT_FL PUB_DBL_FL PUB_PTR_FL PUB_STR_FL PUB_BOOL_FL PUB_BUF_FL PUB_ERR_FL are macros for simplifying the
  * publish method of messages with flags
  */
-#define PUB_INT_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | INT_TYP, (int64_t)(val)))
+#define PUB_INT_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | INT_TYP, (int64_t) (val)))
 #define PUB_DBL_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | DBL_TYP, (double) (val)))
 #define PUB_PTR_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | PTR_TYP, (void *) (val)))
 #define PUB_STR_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | STR_TYP, (char *) (val)))
 #define PUB_BOOL_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | BOOL_TYP, (int) (val)))
 #define PUB_BUF_FL(topic, ptr, sz, dtor, fl)                                                                           \
-	ps_publish(ps_new_msg(topic, (fl) | BUF_TYP, (void *) (ptr), (size_t)(sz), (ps_dtor_t)(dtor)));
+	ps_publish(ps_new_msg(topic, (fl) | BUF_TYP, (void *) (ptr), (size_t) (sz), (ps_dtor_t) (dtor)));
 #define PUB_ERR_FL(topic, id, desc, fl) ps_publish(ps_new_msg(topic, (fl) | ERR_TYP, (int) (id), (char *) (desc)))
 #define PUB_NIL_FL(topic, fl) ps_publish(ps_new_msg(topic, (fl) | NIL_TYP))
 
@@ -457,14 +462,14 @@ void ps_clean_sticky(const char *prefix);
 /**
  * @brief CALL_INT CALL_DBL CALL_PTR CALL_STR CALL_BOOL CALL_BUF are macros for simplifying the call method of messages
  */
-#define CALL_INT(topic, val, timeout) ps_call(ps_new_msg(topic, INT_TYP, (int64_t)(val)), (timeout))
+#define CALL_INT(topic, val, timeout) ps_call(ps_new_msg(topic, INT_TYP, (int64_t) (val)), (timeout))
 #define CALL_DBL(topic, val, timeout) ps_call(ps_new_msg(topic, DBL_TYP, (double) (val)), (timeout))
 #define CALL_PTR(topic, val, timeout) ps_call(ps_new_msg(topic, PTR_TYP, (void *) (val)), (timeout))
 #define CALL_STR(topic, val, timeout) ps_call(ps_new_msg(topic, STR_TYP, (char *) (val)), (timeout))
 #define CALL_BOOL(topic, val, timeout) ps_call(ps_new_msg(topic, BOOL_TYP, (int) (val)), (timeout))
 #define CALL_NIL(topic, timeout) ps_call(ps_new_msg(topic, NIL_TYP), (timeout))
 #define CALL_BUF(topic, ptr, sz, dtor, timeout)                                                                        \
-	ps_call(ps_new_msg(topic, BUF_TYP, (void *) (ptr), (size_t)(sz), (ps_dtor_t)(dtor)), (timeout))
+	ps_call(ps_new_msg(topic, BUF_TYP, (void *) (ptr), (size_t) (sz), (ps_dtor_t) (dtor)), (timeout))
 
 /**
  * @brief IS_INT IS_DBL IS_PTR IS_STR IS_BOOL IS_BUF IS_ERR are macros for simplifying the way of checking the type of

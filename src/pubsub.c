@@ -8,27 +8,16 @@
 #include "uthash.h"
 #include "utlist.h"
 
-#ifdef PS_FREE_RTOS
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
-#else
-#include <pthread.h>
-#include <semaphore.h>
-#endif
+#include "sync.h"
 
 typedef struct ps_queue_s {
-#ifdef PS_FREE_RTOS
-	QueueHandle_t queue;
-#else
 	ps_msg_t **messages;
 	size_t size;
 	size_t count;
 	size_t head;
 	size_t tail;
-	pthread_mutex_t mux;
-	sem_t not_empty;
-#endif
+	mutex_t mux;
+	semaphore_t not_empty;
 } ps_queue_t;
 
 typedef struct subscriber_list_s {
@@ -60,11 +49,7 @@ struct ps_subscriber_s {
 	void *userData;
 };
 
-#ifdef PS_FREE_RTOS
-static SemaphoreHandle_t lock;
-#else
-static pthread_mutex_t lock;
-#endif
+static mutex_t lock;
 
 static topic_map_t *topic_map = NULL;
 
@@ -73,78 +58,37 @@ static uint32_t uuid_ctr;
 static uint32_t stat_live_msg;
 static uint32_t stat_live_subscribers;
 
-#ifdef PS_FREE_RTOS
-#define PORT_LOCK xSemaphoreTake(lock, portMAX_DELAY);
-#define PORT_UNLOCK xSemaphoreGive(lock);
-#else
-#define PORT_LOCK pthread_mutex_lock(&lock);
-#define PORT_UNLOCK pthread_mutex_unlock(&lock);
-#endif
+#define GLOBAL_LOCK mutex_lock(lock);
+#define GLOBAL_UNLOCK mutex_unlock(lock);
 
 void ps_init(void) {
-#ifdef PS_FREE_RTOS
-	lock = xSemaphoreCreateMutex();
-#else
-	pthread_mutex_init(&lock, NULL);
-#endif
+	mutex_init(&lock);
 }
 
-#ifndef PS_FREE_RTOS
-static int deadline_ms(int64_t ms, struct timespec *tout) {
-#ifdef PS_USE_GETTIMEOFDAY
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	tout->tv_sec = tv.tv_sec;
-	tout->tv_nsec = tv.tv_usec * 1000;
-#else
-	clock_gettime(CLOCK_REALTIME, tout);
-#endif
-	tout->tv_sec += (ms / 1000);
-	tout->tv_nsec += ((ms % 1000) * 1000000);
-	if (tout->tv_nsec > 1000000000) {
-		tout->tv_sec++;
-		tout->tv_nsec -= 1000000000;
-	}
-	return 0;
+void ps_deinit(void) {
+	mutex_destroy(&lock);
 }
-#endif
 
 static ps_queue_t *ps_new_queue(size_t sz) {
-
 	ps_queue_t *q = calloc(1, sizeof(ps_queue_t));
-#ifdef PS_FREE_RTOS
-	q->queue = xQueueCreate(sz, sizeof(void *));
-#else
 	q->size = sz;
 	q->messages = calloc(sz, sizeof(void *));
-	pthread_mutex_init(&q->mux, NULL);
-	sem_init(&q->not_empty, 0, 0);
+	mutex_init(&q->mux);
+	semaphore_init(&q->not_empty, 0);
 
-#endif
 	return q;
 }
 
 static void ps_free_queue(ps_queue_t *q) {
-#ifdef PS_FREE_RTOS
-	vQueueDelete(q->queue);
-#else
 	free(q->messages);
-	pthread_mutex_destroy(&q->mux);
-	sem_destroy(&q->not_empty);
-#endif
+	mutex_destroy(&q->mux);
+	semaphore_destroy(&q->not_empty);
 	free(q);
 }
 
 static int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
-
-#ifdef PS_FREE_RTOS
-	if (xQueueSend(q->queue, &msg, 0) != pdTRUE) {
-		return -1;
-	}
-	return 0;
-#else
 	int ret = 0;
-	pthread_mutex_lock(&q->mux);
+	mutex_lock(q->mux);
 	if (q->count >= q->size) {
 		ret = -1;
 		goto exit_fn;
@@ -153,62 +97,35 @@ static int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
 	if (++q->head >= q->size)
 		q->head = 0;
 	q->count++;
-	sem_post(&q->not_empty);
+	semaphore_post(q->not_empty);
 
 exit_fn:
-	pthread_mutex_unlock(&q->mux);
+	mutex_unlock(q->mux);
 	return ret;
-#endif
 }
 
 static ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
 	ps_msg_t *msg = NULL;
 
-#ifdef PS_FREE_RTOS
-	if (timeout < 0) {
-		timeout = portMAX_DELAY;
-	}
-	if (xQueueReceive(q->queue, &msg, timeout / portTICK_PERIOD_MS) != pdTRUE) {
-		return NULL;
-	}
-	return msg;
-
-#else
-
-	struct timespec tout = {0};
-	int ret = -1;
-
-	if (timeout < 0) {
-		ret = sem_wait(&q->not_empty);
-	} else {
-		deadline_ms(timeout, &tout);
-		ret = sem_timedwait(&q->not_empty, &tout);
-	}
-
-	if (ret < 0)
+	if (semaphore_wait(q->not_empty, timeout) < 0)
 		return NULL;
 
-	pthread_mutex_lock(&q->mux);
+	mutex_lock(q->mux);
 	msg = q->messages[q->tail];
 	if (++q->tail >= q->size)
 		q->tail = 0;
 	q->count--;
-	pthread_mutex_unlock(&q->mux);
+	mutex_unlock(q->mux);
 
 	return msg;
-#endif
 }
 
 static size_t ps_queue_waiting(ps_queue_t *q) {
-#ifdef PS_FREE_RTOS
-	return uxQueueMessagesWaiting(q->queue);
-#else
 	size_t res = 0;
-	pthread_mutex_lock(&q->mux);
+	mutex_lock(q->mux);
 	res = q->count;
-	pthread_mutex_unlock(&q->mux);
+	mutex_unlock(q->mux);
 	return res;
-#endif
 }
 
 static void ps_msg_free_value(ps_msg_t *msg) {
@@ -469,14 +386,14 @@ void *ps_subscriber_user_data(ps_subscriber_t *s) {
 }
 
 void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
-	PORT_LOCK
+	GLOBAL_LOCK
 	su->new_msg_cb = cb;
 	if (ps_queue_waiting(su->q) > 0) {
 		if (su->new_msg_cb != NULL) {
 			(su->new_msg_cb)(su);
 		}
 	}
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 }
 
 int ps_stats_live_subscribers(void) {
@@ -541,7 +458,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 		}
 	}
 
-	PORT_LOCK
+	GLOBAL_LOCK
 	tm = fetch_topic_create_if_not_exist(topic);
 	DL_SEARCH_SCALAR(tm->subscribers, sl, su, su);
 	if (sl != NULL) {
@@ -567,7 +484,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	}
 
 exit_fn:
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 	free(topic);
 	return ret;
 }
@@ -584,7 +501,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *otopic) {
 		*fl_str = '\0';
 	}
 
-	PORT_LOCK
+	GLOBAL_LOCK
 	tm = fetch_topic(topic);
 	if (tm == NULL) {
 		ret = -1;
@@ -605,7 +522,7 @@ int ps_unsubscribe(ps_subscriber_t *su, const char *otopic) {
 	}
 
 exit_fn:
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 	free(topic);
 	return ret;
 }
@@ -627,7 +544,7 @@ int ps_unsubscribe_all(ps_subscriber_t *su) {
 	subscriber_list_t *sl;
 	size_t count = 0;
 
-	PORT_LOCK
+	GLOBAL_LOCK
 	s = su->subs;
 	while (s != NULL) {
 		DL_SEARCH_SCALAR(s->tm->subscribers, sl, su, su);
@@ -642,7 +559,7 @@ int ps_unsubscribe_all(ps_subscriber_t *su) {
 		count++;
 	}
 	su->subs = NULL;
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 	return count;
 }
 
@@ -671,7 +588,7 @@ void ps_clean_sticky(const char *prefix) {
 	topic_map_t *tm, *tm_tmp;
 
 	size_t pl = strlen(prefix);
-	PORT_LOCK
+	GLOBAL_LOCK
 	HASH_ITER(hh, topic_map, tm, tm_tmp) {
 		if (pl == 0 || (strncmp(prefix, tm->topic, pl) == 0 && (tm->topic[pl] == 0 || tm->topic[pl] == '.'))) {
 			if (tm->sticky != NULL) {
@@ -681,7 +598,7 @@ void ps_clean_sticky(const char *prefix) {
 			}
 		}
 	}
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 }
 
 int ps_publish(ps_msg_t *msg) {
@@ -691,7 +608,7 @@ int ps_publish(ps_msg_t *msg) {
 	subscriber_list_t *sl = NULL;
 	size_t ret = 0;
 	char *topic = strdup(msg->topic);
-	PORT_LOCK
+	GLOBAL_LOCK
 	bool first = true;
 	while (strlen(topic) > 0) {
 		tm = fetch_topic(topic);
@@ -737,7 +654,7 @@ int ps_publish(ps_msg_t *msg) {
 	}
 	ps_unref_msg(msg);
 	free(topic);
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 	return ret;
 }
 
@@ -750,7 +667,7 @@ int ps_subs_count(char *topic_) {
 	subscriber_list_t *sl = NULL;
 	size_t count = 0;
 
-	PORT_LOCK
+	GLOBAL_LOCK
 	while (strlen(topic) > 0) {
 		tm = fetch_topic(topic);
 		if (tm != NULL) {
@@ -769,7 +686,7 @@ int ps_subs_count(char *topic_) {
 		}
 	}
 	free(topic);
-	PORT_UNLOCK
+	GLOBAL_UNLOCK
 	return count;
 }
 

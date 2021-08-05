@@ -87,6 +87,7 @@ B63_BENCHMARK(ps_unref_msg, n) {
 }
 
 int main(int argc, char **argv) {
+	ps_init();
 	B63_RUN(argc, argv);
 	return 0;
 }

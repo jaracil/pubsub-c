@@ -497,5 +497,6 @@ void run_all(void) {
 int main(void) {
 	ps_init();
 	run_all();
+	ps_deinit();
 	return 0;
 }
