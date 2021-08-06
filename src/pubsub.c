@@ -9,16 +9,7 @@
 #include "utlist.h"
 
 #include "sync.h"
-
-typedef struct ps_queue_s {
-	ps_msg_t **messages;
-	size_t size;
-	size_t count;
-	size_t head;
-	size_t tail;
-	mutex_t mux;
-	semaphore_t not_empty;
-} ps_queue_t;
+#include "psqueue.h"
 
 typedef struct subscriber_list_s {
 	ps_subscriber_t *su;
@@ -67,65 +58,6 @@ void ps_init(void) {
 
 void ps_deinit(void) {
 	mutex_destroy(&lock);
-}
-
-static ps_queue_t *ps_new_queue(size_t sz) {
-	ps_queue_t *q = calloc(1, sizeof(ps_queue_t));
-	q->size = sz;
-	q->messages = calloc(sz, sizeof(void *));
-	mutex_init(&q->mux);
-	semaphore_init(&q->not_empty, 0);
-
-	return q;
-}
-
-static void ps_free_queue(ps_queue_t *q) {
-	free(q->messages);
-	mutex_destroy(&q->mux);
-	semaphore_destroy(&q->not_empty);
-	free(q);
-}
-
-static int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
-	int ret = 0;
-	mutex_lock(q->mux);
-	if (q->count >= q->size) {
-		ret = -1;
-		goto exit_fn;
-	}
-	q->messages[q->head] = msg;
-	if (++q->head >= q->size)
-		q->head = 0;
-	q->count++;
-	semaphore_post(q->not_empty);
-
-exit_fn:
-	mutex_unlock(q->mux);
-	return ret;
-}
-
-static ps_msg_t *ps_queue_pull(ps_queue_t *q, int64_t timeout) {
-	ps_msg_t *msg = NULL;
-
-	if (semaphore_wait(q->not_empty, timeout) < 0)
-		return NULL;
-
-	mutex_lock(q->mux);
-	msg = q->messages[q->tail];
-	if (++q->tail >= q->size)
-		q->tail = 0;
-	q->count--;
-	mutex_unlock(q->mux);
-
-	return msg;
-}
-
-static size_t ps_queue_waiting(ps_queue_t *q) {
-	size_t res = 0;
-	mutex_lock(q->mux);
-	res = q->count;
-	mutex_unlock(q->mux);
-	return res;
 }
 
 static void ps_msg_free_value(ps_msg_t *msg) {
