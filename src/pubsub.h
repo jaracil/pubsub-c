@@ -84,6 +84,7 @@ typedef struct ps_msg_s {
 	char *topic;   // Message topic
 	char *rtopic;  // Response topic
 	uint32_t flags;
+	int8_t priority;
 	union {
 		double dbl_val;
 		int64_t int_val;

@@ -44,6 +44,10 @@ int semaphore_post(semaphore_t s) {
 	return xSemaphoreGive((SemaphoreHandle_t) s) ? 0 : -1;
 }
 
+int semaphore_get(semaphore_t s) {
+	return uxSemaphoreGetCount((SemaphoreHandle_t) s);
+}
+
 void semaphore_destroy(semaphore_t *_s) {
 	SemaphoreHandle_t *s = (SemaphoreHandle_t *) _s;
 	vSemaphoreDelete(*s);

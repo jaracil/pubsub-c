@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include "psqueue.h"
 #include "sync.h"
-#include "pubsub.h"
 
 #ifdef PS_QUEUE_LL
 
@@ -32,7 +31,8 @@ void ps_free_queue(ps_queue_t *q) {
 	free(q);
 }
 
-int ps_queue_push(ps_queue_t *q, ps_msg_t *msg) {
+int ps_queue_push(ps_queue_t *q, ps_msg_t *msg, uint8_t priority) {
+	(void) priority; // This implementation has no priority
 	int ret = 0;
 	mutex_lock(q->mux);
 	if (q->count >= q->size) {

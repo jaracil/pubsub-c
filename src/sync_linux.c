@@ -70,6 +70,13 @@ int semaphore_post(semaphore_t _s) {
 	return sem_post(s);
 }
 
+int semaphore_get(semaphore_t _s) {
+	sem_t *s = (sem_t *) _s;
+	int val = 0;
+	sem_getvalue(s, &val);
+	return val;
+}
+
 void semaphore_destroy(semaphore_t *_s) {
 	sem_t **s = (sem_t **) _s;
 	sem_destroy(*s);

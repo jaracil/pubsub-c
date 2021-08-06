@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "pubsub.h"
 #include "uthash.h"
@@ -15,6 +16,7 @@ typedef struct subscriber_list_s {
 	ps_subscriber_t *su;
 	bool hidden;
 	bool on_empty;
+	int8_t priority;
 	struct subscriber_list_s *next;
 	struct subscriber_list_s *prev;
 } subscriber_list_t;
@@ -108,6 +110,7 @@ ps_msg_t *ps_new_msg(const char *topic, uint32_t flags, ...) {
 	msg->flags = flags;
 	msg->topic = strdup(topic);
 	msg->rtopic = NULL;
+	msg->priority = 0;
 
 	va_list args;
 	va_start(args, flags);
@@ -125,6 +128,7 @@ ps_msg_t *ps_dup_msg(ps_msg_t const *msg_orig) {
 	ps_msg_t *msg = malloc(sizeof(ps_msg_t));
 	memcpy(msg, msg_orig, sizeof(ps_msg_t));
 	msg->_ref = 1;
+	msg->priority = msg_orig->priority;
 	if (msg_orig->topic != NULL) {
 		msg->topic = strdup(msg_orig->topic);
 	}
@@ -266,12 +270,17 @@ static topic_map_t *fetch_topic_create_if_not_exist(const char *topic) {
 	return tm;
 }
 
-static int push_subscriber_queue(ps_subscriber_t *su, ps_msg_t *msg) {
+static int push_subscriber_queue(ps_subscriber_t *su, ps_msg_t *msg, uint8_t priority) {
 	ps_ref_msg(msg);
-	if (ps_queue_push(su->q, msg) != 0) {
-		__sync_add_and_fetch(&su->overflow, 1);
+	switch (ps_queue_push(su->q, msg, priority)) {
+	case PS_QUEUE_EFULL:
 		ps_unref_msg(msg);
+	// fallthrough
+	case PS_QUEUE_EOVERFLOW:
+		__sync_add_and_fetch(&su->overflow, 1);
 		return -1;
+	default:
+		break;
 	}
 	if (su->new_msg_cb != NULL) {
 		(su->new_msg_cb)(su);
@@ -280,14 +289,14 @@ static int push_subscriber_queue(ps_subscriber_t *su, ps_msg_t *msg) {
 	return 0;
 }
 
-static void push_child_sticky(ps_subscriber_t *su, const char *prefix) {
+static void push_child_sticky(ps_subscriber_t *su, const char *prefix, uint8_t priority) {
 	topic_map_t *tm, *tm_tmp;
 
 	size_t pl = strlen(prefix);
 	HASH_ITER(hh, topic_map, tm, tm_tmp) {
 		if (pl == 0 || (strncmp(prefix, tm->topic, pl) == 0 && (tm->topic[pl] == 0 || tm->topic[pl] == '.'))) {
 			if (tm->sticky != NULL) {
-				push_subscriber_queue(su, tm->sticky);
+				push_subscriber_queue(su, tm->sticky, priority);
 			}
 		}
 	}
@@ -366,11 +375,13 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	bool on_empty_flag = false;
 	bool no_sticky_flag = false;
 	bool child_sticky_flag = false;
+	uint8_t priority = 0;
 
 	char *fl_str = strchr(topic, ' ');
 	if (fl_str != NULL) {
 		*fl_str = '\0';
 		fl_str++;
+
 		while (*fl_str != '\0') {
 			switch (*fl_str) {
 			case 'h':
@@ -385,6 +396,10 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 			case 'e':
 				on_empty_flag = true;
 				break;
+			case 'p':
+				if (isdigit(*(fl_str + 1))) {
+					priority = *(fl_str + 1) - '0';
+				}
 			}
 			fl_str++;
 		}
@@ -401,16 +416,17 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	sl->su = su;
 	sl->hidden = hidden_flag;
 	sl->on_empty = on_empty_flag;
+	sl->priority = priority;
 	DL_APPEND(tm->subscribers, sl);
 	subs = calloc(1, sizeof(*subs));
 	subs->tm = tm;
 	DL_APPEND(su->subs, subs);
 	if (!no_sticky_flag) {
 		if (child_sticky_flag) {
-			push_child_sticky(su, topic);
+			push_child_sticky(su, topic, sl->priority);
 		} else {
 			if (tm->sticky != NULL) {
-				push_subscriber_queue(su, tm->sticky);
+				push_subscriber_queue(su, tm->sticky, sl->priority);
 			}
 		}
 	}
@@ -569,7 +585,7 @@ int ps_publish(ps_msg_t *msg) {
 				if (sl->on_empty && ps_waiting(sl->su) != 0) {
 					continue;
 				}
-				if (push_subscriber_queue(sl->su, msg) == 0 && !sl->hidden) {
+				if (push_subscriber_queue(sl->su, msg, sl->priority) == 0 && !sl->hidden) {
 					ret++;
 				}
 			}

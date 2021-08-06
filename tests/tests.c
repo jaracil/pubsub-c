@@ -468,6 +468,38 @@ void test_subscriber_userdata(void) {
 	check_leak();
 }
 
+void test_priority(void) {
+	printf("Test priority\n");
+
+#ifdef PS_QUEUE_LL
+	printf(">> WARNING: The selected queue implemetation doesn't support priorities\n");
+	return;
+#endif
+
+	ps_subscriber_t *su = ps_new_subscriber(3, STRLIST("lost", "foo", "bar p1", "baz p9"));
+	PUB_NIL("foo");
+	PUB_NIL("lost");
+	PUB_NIL("baz");
+	PUB_NIL("bar");
+
+	assert(ps_overflow(su) == 1);
+
+	ps_msg_t *msg = NULL;
+	msg = ps_get(su, 1000);
+	assert(ps_has_topic(msg, "baz"));
+	ps_unref_msg(msg);
+
+	msg = ps_get(su, 1000);
+	assert(ps_has_topic(msg, "bar"));
+	ps_unref_msg(msg);
+
+	msg = ps_get(su, 1000);
+	assert(ps_has_topic(msg, "foo"));
+	ps_unref_msg(msg);
+
+	assert(ps_waiting(su) == 0);
+}
+
 void run_all(void) {
 	test_subscriptions();
 	test_hidden_subscription();
@@ -491,6 +523,7 @@ void run_all(void) {
 	test_msg_getset();
 	test_dup_msg();
 	test_subscriber_userdata();
+	test_priority();
 	printf("All tests passed!\n");
 }
 

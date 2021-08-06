@@ -5,6 +5,6 @@ sdkconfig
 *~
 *.out*
 *.gc*
-
+perf.data
 /docs/xml
 /docs/html
