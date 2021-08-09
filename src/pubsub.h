@@ -16,6 +16,10 @@
 
 //#define PS_USE_GETTIMEOFDAY // Use gettimeofday instead of monotonic clock_gettime
 
+#if !defined(PS_QUEUE_CUSTOM) && !defined(PS_QUEUE_BUCKET)
+#define PS_QUEUE_BUCKET
+#endif
+
 /**
  * @brief Flags associated to the message:
  * FL_STICKY: Stores the las message sent to the topic and automatically publish it to new subscribers to that topic.
