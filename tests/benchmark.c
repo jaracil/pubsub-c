@@ -2,92 +2,96 @@
 #include <time.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 #include "pubsub.h"
-#include "b63/b63.h"
-#include "b63/counters/perf_events.h"
 
-B63_BENCHMARK(publish_with_a_subscriber, n) {
-	ps_subscriber_t *su;
-
-	B63_SUSPEND {
-		su = ps_new_subscriber(1000000, STRLIST("topic.a"));
-	}
-
-	for (int i = 0; i < n; i++) {
-		PUB_INT("topic.a", 5);
-	}
-
-	B63_SUSPEND {
-		ps_free_subscriber(su);
-	}
+uint64_t timespec_to_ns(struct timespec t) {
+	return t.tv_sec * 1000000000 + t.tv_nsec;
 }
 
-B63_BENCHMARK(publish_without_subscriber, n) {
-	ps_subscriber_t *su;
+#define BENCH(S, N, X)                                                                                                 \
+	do {                                                                                                               \
+		struct timespec t0, t1;                                                                                        \
+		clock_gettime(CLOCK_MONOTONIC, &t0);                                                                           \
+		for (int i = 0; i < N; i++) {                                                                                  \
+			X;                                                                                                         \
+		}                                                                                                              \
+		clock_gettime(CLOCK_MONOTONIC, &t1);                                                                           \
+		uint64_t elapsed = timespec_to_ns(t1) - timespec_to_ns(t0);                                                    \
+		printf("%s/%s\t%ld ns/op\n", __FUNCTION__, S, elapsed / N);                                                    \
+	} while (0);
 
-	B63_SUSPEND {
-		su = ps_new_subscriber(1000000, STRLIST("topic.a"));
-	}
+#define ITERATIONS 1000000
 
-	for (int i = 0; i < n; i++) {
-		PUB_INT("topic.b", 5);
-	}
-
-	B63_SUSPEND {
-		ps_free_subscriber(su);
-	}
-}
-
-B63_BENCHMARK(ps_get, n) {
-	ps_subscriber_t *su;
-
-	B63_SUSPEND {
-		su = ps_new_subscriber(1000000, STRLIST("topic.a"));
-	}
-
-	for (int i = 0; i < n; i++) {
-		B63_SUSPEND {
-			PUB_INT("topic.a", 5);
-		}
-
-		ps_msg_t *msg = ps_get(su, 5000);
-
-		B63_SUSPEND {
-			if (msg != NULL)
-				ps_unref_msg(msg);
-		}
-	}
-
-	B63_SUSPEND {
-		ps_free_subscriber(su);
-	}
-}
-
-B63_BENCHMARK(ps_unref_msg, n) {
+void test1(void) {
 	ps_subscriber_t *su = NULL;
-	ps_msg_t *msg = NULL;
 
-	B63_SUSPEND {
-		su = ps_new_subscriber(1000000, STRLIST("topic.a"));
+	su = ps_new_subscriber(ITERATIONS, STRLIST("topic.a"));
+	BENCH("publish without sub", ITERATIONS, { PUB_INT("topic.b", 5); });
+	BENCH("publish without overflow", ITERATIONS, { PUB_INT("topic.a", 5); });
+	BENCH("publish with overflow", ITERATIONS, { PUB_INT("topic.a", 5); });
+	BENCH("ps_get and ps_unref_msg", ITERATIONS, { ps_unref_msg(ps_get(su, 1000)); });
+	// BENCH("ps_get and wait 1s", 1, { ps_unref_msg(ps_get(su, 1000)); });
+
+	ps_free_subscriber(su);
+}
+
+void test2(void) {
+	ps_subscriber_t *su = NULL;
+
+	su = ps_new_subscriber(ITERATIONS, STRLIST("topic.a"));
+	char t[128] = {0};
+	for (int i = 0; i < 1000; i++) {
+		snprintf(t, 128, "t%d", i);
+		ps_subscribe(su, t);
 	}
+	BENCH("publish nonsubbed topic (1 sub 1000 topics)", ITERATIONS, { PUB_INT("topic.b", 5); });
+
+	ps_free_subscriber(su);
+}
+
+void test3(size_t n) {
+	ps_subscriber_t **su = calloc(n, sizeof(ps_subscriber_t *));
+
+	for (size_t i = 0; i < n; i++) {
+		su[i] = ps_new_subscriber(100, STRLIST("topic.a"));
+	}
+
+	char t[128] = {0};
+	snprintf(t, 128, "publish nonsubbed topic (%ld subs 1 topic) ", n);
+	BENCH(t, 100, { PUB_INT("topic.b", 5); });
 
 	for (int i = 0; i < n; i++) {
-		B63_SUSPEND {
-			PUB_INT("topic.a", 5);
-			msg = ps_get(su, 5000);
-		}
+		ps_free_subscriber(su[i]);
+	}
+}
 
-		if (msg != NULL)
-			ps_unref_msg(msg);
+void test4(size_t n) {
+	ps_subscriber_t **su = calloc(n, sizeof(ps_subscriber_t *));
+
+	for (size_t i = 0; i < n; i++) {
+		su[i] = ps_new_subscriber(100, STRLIST("topic.a"));
 	}
 
-	B63_SUSPEND {
-		ps_free_subscriber(su);
+	char t[128] = {0};
+	snprintf(t, 128, "publish subbed topic (%ld subs 1 topic)", n);
+	BENCH(t, 100, { PUB_INT("topic.a", 5); });
+
+	for (int i = 0; i < n; i++) {
+		ps_free_subscriber(su[i]);
 	}
+
+	free(su);
 }
 
 int main(int argc, char **argv) {
 	ps_init();
-	B63_RUN(argc, argv);
+	test1();
+	test2();
+	for (size_t i = 0; i < 5; i++)
+		test3(pow(10, i));
+	for (size_t i = 0; i < 5; i++)
+		test4(pow(10, i));
+	ps_deinit();
 	return 0;
 }
