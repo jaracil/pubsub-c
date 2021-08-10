@@ -46,6 +46,8 @@ static int bqueue_get_available(ps_queue_t *q, node_t **n, uint8_t max_prio) {
 	for (size_t i = 0; i < max_prio; i++) {
 		if (q->priorities[i] != NULL) {
 			*n = q->priorities[i]->prev;
+			ps_unref_msg((*n)->msg);
+			(*n)->msg = NULL;
 			DL_DELETE(q->priorities[i], *n);
 			return PS_QUEUE_EOVERFLOW;
 		}

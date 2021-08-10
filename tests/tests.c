@@ -39,7 +39,8 @@ static void new_msg_cb(ps_subscriber_t *su) {
 /* Test Functions */
 void test_subscriptions(void) {
 	printf("Test subscriptions\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s1 = ps_new_subscriber(10, NULL);
+	assert(ps_subscribe(s1, "foo.bar") == 0);
 	assert(ps_subscribe(s1, "foo.bar") == -1);
 	assert(ps_unsubscribe(s1, "foo.baz") == -1);
 	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
@@ -63,6 +64,34 @@ void test_hidden_subscription(void) {
 	assert(ps_waiting(s2) == 1);
 	ps_free_subscriber(s1);
 	ps_free_subscriber(s2);
+	check_leak();
+}
+
+void test_weird_subscription(void) {
+	printf("Test weird subscription\n");
+	ps_subscriber_t *su = ps_new_subscriber(10, NULL);
+
+	assert(ps_subscribe(su, "") == 0); // Test global suscription
+	assert(PUB_NIL("foo") == 1);
+	assert(ps_waiting(su) == 1);
+	ps_flush(su);
+	ps_subscribe(su, "bar 123!#"); // Test undefined flags
+	PUB_NIL("bar");
+	assert(ps_waiting(su) == 2);
+	ps_flush(su);
+	ps_unsubscribe_all(su);
+
+	ps_subscribe(su, "baz p"); // Test malformed priority flag
+	PUB_NIL("baz");
+	assert(ps_waiting(su) == 1);
+	ps_flush(su);
+
+	ps_subscribe(su, "baz pkk"); // Test priority flag with nondigit parameters
+	PUB_NIL("baz");
+	assert(ps_waiting(su) == 1);
+	ps_flush(su);
+
+	ps_free_subscriber(su);
 	check_leak();
 }
 
@@ -498,11 +527,19 @@ void test_priority(void) {
 	ps_unref_msg(msg);
 
 	assert(ps_waiting(su) == 0);
+
+	PUB_NIL("foo");
+	PUB_NIL("baz");
+	PUB_NIL("bar");
+
+	ps_free_subscriber(su);
+	check_leak();
 }
 
 void run_all(void) {
 	test_subscriptions();
 	test_hidden_subscription();
+	test_weird_subscription();
 	test_subscribe_many();
 	test_subs_count();
 	test_publish();
