@@ -290,10 +290,17 @@ ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout);
 
 /**
  * @brief ps_subscribe adds topic to the subscriber instance
- *
  * @param su subscriber instance
  * @param topic string path of topic to subscribe
  * @return status (-1 = Error, 0 = Ok)
+ *
+ * Several flags can be encoded within the topic using a SPACE separator:
+ *   * "foo.bar h": Marks the subscription as hidden and will not count towards a ps_publish() number of receivers
+ *   * "foo.bar e": This subscriber only wants to receive messages from this topic when its empty (has 0 messages
+ * ps_waiting())
+ *   * "foo.bar p5": Assigns priority 5 to messages from this topic. 0: lowest priority, 9: highest priority
+ *   * "foo.bar s": Do not receive stickied messages
+ *   * "foo.bar S": Receive stickied messages from the child topics
  */
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
 
