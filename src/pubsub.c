@@ -704,7 +704,7 @@ int ps_publish(ps_msg_t *msg) {
 	char *topic = strdup(msg->topic);
 	PORT_LOCK
 	bool first = true;
-	while (strlen(topic) > 0) {
+	for (;;) {
 		tm = fetch_topic(topic);
 		if (first) {
 			first = false;
@@ -738,6 +738,11 @@ int ps_publish(ps_msg_t *msg) {
 		}
 		if (msg->flags & FL_NONRECURSIVE)
 			break;
+
+		if (topic[0] == '\0') {
+			break;
+		}
+
 		for (size_t n = strlen(topic); n > 0; n--) {
 			if (topic[n - 1] == '.') {
 				topic[n - 1] = 0;
