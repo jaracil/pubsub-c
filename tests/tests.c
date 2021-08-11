@@ -73,6 +73,7 @@ void test_weird_subscription(void) {
 
 	assert(ps_subscribe(su, "") == 0); // Test global suscription
 	assert(PUB_NIL("foo") == 1);
+	assert(PUB_NIL_FL("foo", FL_NONRECURSIVE) == 0);
 	assert(ps_waiting(su) == 1);
 	ps_flush(su);
 	ps_subscribe(su, "bar 123!#"); // Test undefined flags
