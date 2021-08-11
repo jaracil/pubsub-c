@@ -12,15 +12,16 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     
     steps:
     - uses: actions/checkout@v1
+
     - name: Build
-      run: cd tests && make all
+      run: make -C tests
+
     - name: Run tests
-      run: cd tests && ./tests.out
-    - name: Get Covarage Tests
-      run: cd tests && gcov ./tests.out
-    - name: Get Covarage Pubsub
-      run: cd tests && gcov pubsub.c
+      run: make -C tests test
+
+    - name: Get coverage results
+      run: make -C tests coverage

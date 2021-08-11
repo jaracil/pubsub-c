@@ -1,4 +1,4 @@
-# PUBSUB
+# pubsub-c
 
 ## Publish and Subscribe Overview
 
@@ -133,3 +133,21 @@ static void *subscriber_thread(void *v) {
 ```
 
 The full code is available in the `test/example.c`.
+
+## Selecting a backend
+### Thread synchronization mechanism
+You can select which synchronization mechanism do you want to use:
+* Linux using `-DPS_SYNC_CUSTOM -DPS_SYNC_LINUX` (default)
+* FreeRTOS using `-DPS_SYNC_CUSTOM -DPS_SYNC_FREERTOS`
+
+### Queues
+There are two implementations available:
+* Linked list using `-DPS_QUEUE_CUSTOM -DPS_QUEUE_LL` which doesn't support priorities
+* Priority queue implemented with a bucket queue, using `-DPS_QUEUE_CUSTOM -DPS_QUEUE_BUCKET` (default)
+
+## Testing
+
+You can run the tests and get coverage analysis running
+```bash
+$ make -C tests all
+```

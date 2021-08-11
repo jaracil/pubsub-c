@@ -16,6 +16,10 @@
 
 //#define PS_USE_GETTIMEOFDAY // Use gettimeofday instead of monotonic clock_gettime
 
+#if !defined(PS_QUEUE_CUSTOM) && !defined(PS_QUEUE_BUCKET)
+#define PS_QUEUE_BUCKET
+#endif
+
 /**
  * @brief Flags associated to the message:
  * FL_STICKY: Stores the las message sent to the topic and automatically publish it to new subscribers to that topic.
@@ -84,6 +88,7 @@ typedef struct ps_msg_s {
 	char *topic;   // Message topic
 	char *rtopic;  // Response topic
 	uint32_t flags;
+	int8_t priority;
 	union {
 		double dbl_val;
 		int64_t int_val;
@@ -103,6 +108,11 @@ typedef void (*new_msg_cb_t)(ps_subscriber_t *);
  * @brief ps_init initializes the publish/subscribe internal context.
  */
 void ps_init(void);
+
+/**
+ * @brief ps_init deinitializes the publish/subscribe internal context.
+ */
+void ps_deinit(void);
 
 /**
  * @brief ps_new_msg generic method to create a new message to be published
@@ -280,10 +290,17 @@ ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout);
 
 /**
  * @brief ps_subscribe adds topic to the subscriber instance
- *
  * @param su subscriber instance
  * @param topic string path of topic to subscribe
  * @return status (-1 = Error, 0 = Ok)
+ *
+ * Several flags can be encoded within the topic using a SPACE separator:
+ *   * "foo.bar h": Marks the subscription as hidden and will not count towards a ps_publish() number of receivers
+ *   * "foo.bar e": This subscriber only wants to receive messages from this topic when its empty (has 0 messages
+ * ps_waiting())
+ *   * "foo.bar p5": Assigns priority 5 to messages from this topic. 0: lowest priority, 9: highest priority
+ *   * "foo.bar s": Do not receive stickied messages
+ *   * "foo.bar S": Receive stickied messages from the child topics
  */
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
 
@@ -431,13 +448,13 @@ void ps_clean_sticky(const char *prefix);
  * @brief PUB_INT_FL PUB_DBL_FL PUB_PTR_FL PUB_STR_FL PUB_BOOL_FL PUB_BUF_FL PUB_ERR_FL are macros for simplifying the
  * publish method of messages with flags
  */
-#define PUB_INT_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | INT_TYP, (int64_t)(val)))
+#define PUB_INT_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | INT_TYP, (int64_t) (val)))
 #define PUB_DBL_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | DBL_TYP, (double) (val)))
 #define PUB_PTR_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | PTR_TYP, (void *) (val)))
 #define PUB_STR_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | STR_TYP, (char *) (val)))
 #define PUB_BOOL_FL(topic, val, fl) ps_publish(ps_new_msg(topic, (fl) | BOOL_TYP, (int) (val)))
 #define PUB_BUF_FL(topic, ptr, sz, dtor, fl)                                                                           \
-	ps_publish(ps_new_msg(topic, (fl) | BUF_TYP, (void *) (ptr), (size_t)(sz), (ps_dtor_t)(dtor)));
+	ps_publish(ps_new_msg(topic, (fl) | BUF_TYP, (void *) (ptr), (size_t) (sz), (ps_dtor_t) (dtor)));
 #define PUB_ERR_FL(topic, id, desc, fl) ps_publish(ps_new_msg(topic, (fl) | ERR_TYP, (int) (id), (char *) (desc)))
 #define PUB_NIL_FL(topic, fl) ps_publish(ps_new_msg(topic, (fl) | NIL_TYP))
 
@@ -457,14 +474,14 @@ void ps_clean_sticky(const char *prefix);
 /**
  * @brief CALL_INT CALL_DBL CALL_PTR CALL_STR CALL_BOOL CALL_BUF are macros for simplifying the call method of messages
  */
-#define CALL_INT(topic, val, timeout) ps_call(ps_new_msg(topic, INT_TYP, (int64_t)(val)), (timeout))
+#define CALL_INT(topic, val, timeout) ps_call(ps_new_msg(topic, INT_TYP, (int64_t) (val)), (timeout))
 #define CALL_DBL(topic, val, timeout) ps_call(ps_new_msg(topic, DBL_TYP, (double) (val)), (timeout))
 #define CALL_PTR(topic, val, timeout) ps_call(ps_new_msg(topic, PTR_TYP, (void *) (val)), (timeout))
 #define CALL_STR(topic, val, timeout) ps_call(ps_new_msg(topic, STR_TYP, (char *) (val)), (timeout))
 #define CALL_BOOL(topic, val, timeout) ps_call(ps_new_msg(topic, BOOL_TYP, (int) (val)), (timeout))
 #define CALL_NIL(topic, timeout) ps_call(ps_new_msg(topic, NIL_TYP), (timeout))
 #define CALL_BUF(topic, ptr, sz, dtor, timeout)                                                                        \
-	ps_call(ps_new_msg(topic, BUF_TYP, (void *) (ptr), (size_t)(sz), (ps_dtor_t)(dtor)), (timeout))
+	ps_call(ps_new_msg(topic, BUF_TYP, (void *) (ptr), (size_t) (sz), (ps_dtor_t) (dtor)), (timeout))
 
 /**
  * @brief IS_INT IS_DBL IS_PTR IS_STR IS_BOOL IS_BUF IS_ERR are macros for simplifying the way of checking the type of
