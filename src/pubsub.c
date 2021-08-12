@@ -39,6 +39,7 @@ struct ps_subscriber_s {
 	subscriptions_list_t *subs;
 	uint32_t overflow;
 	new_msg_cb_t new_msg_cb;
+	non_empty_cb_t non_empty_cb;
 	void *userData;
 };
 
@@ -282,9 +283,12 @@ static int push_subscriber_queue(ps_subscriber_t *su, ps_msg_t *msg, uint8_t pri
 	default:
 		break;
 	}
-	if (su->new_msg_cb != NULL) {
+
+	if (su->non_empty_cb != NULL && ps_queue_waiting(su->q) == 1)
+		(su->non_empty_cb)(su);
+
+	if (su->new_msg_cb != NULL)
 		(su->new_msg_cb)(su);
-	}
 
 	return 0;
 }
@@ -332,6 +336,17 @@ void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
 	if (ps_queue_waiting(su->q) > 0) {
 		if (su->new_msg_cb != NULL) {
 			(su->new_msg_cb)(su);
+		}
+	}
+	GLOBAL_UNLOCK
+}
+
+void ps_set_non_empty_cb(ps_subscriber_t *su, non_empty_cb_t cb) {
+	GLOBAL_LOCK
+	su->non_empty_cb = cb;
+	if (ps_queue_waiting(su->q) == 1) {
+		if (su->non_empty_cb != NULL) {
+			(su->non_empty_cb)(su);
 		}
 	}
 	GLOBAL_UNLOCK

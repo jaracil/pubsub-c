@@ -103,6 +103,7 @@ typedef struct ps_msg_s {
 typedef struct ps_subscriber_s ps_subscriber_t; // Private definition
 
 typedef void (*new_msg_cb_t)(ps_subscriber_t *);
+typedef void (*non_empty_cb_t)(ps_subscriber_t *);
 
 /**
  * @brief ps_init initializes the publish/subscribe internal context.
@@ -346,6 +347,14 @@ int ps_unsubscribe_all(ps_subscriber_t *su);
  * @param cb callback function pointer
  */
 void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb);
+
+/**
+ * @brief ps_set_non_empty_cb set up a callback which is called when the queue is empty and a new message arrives
+ *
+ * @param su subscriber instance
+ * @param cb callback function pointer
+ */
+void ps_set_non_empty_cb(ps_subscriber_t *su, non_empty_cb_t cb);
 
 /**
  * @brief ps_flush clears all messages pending in the queue

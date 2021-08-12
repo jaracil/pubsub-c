@@ -34,6 +34,14 @@ static void new_msg_cb(ps_subscriber_t *su) {
 	new_msg_cb_subscriber = su;
 }
 
+static int non_empty_cb_touch;
+static ps_subscriber_t *non_empty_cb_subscriber;
+
+static void non_empty_cb(ps_subscriber_t *su) {
+	non_empty_cb_touch++;
+	non_empty_cb_subscriber = su;
+}
+
 /* End helper functions*/
 
 /* Test Functions */
@@ -326,14 +334,25 @@ void test_new_msg_cb(void) {
 
 	new_msg_cb_touch = 0;
 	new_msg_cb_subscriber = NULL;
+	non_empty_cb_touch = 0;
+	non_empty_cb_subscriber = NULL;
 
 	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
 	PUB_INT("foo.bar", 1);
 	ps_set_new_msg_cb(s1, new_msg_cb);
 	assert(new_msg_cb_touch == 1);
+	assert(new_msg_cb_subscriber == s1);
+	ps_set_non_empty_cb(s1, non_empty_cb);
+	assert(non_empty_cb_touch == 1);
+	assert(non_empty_cb_subscriber == s1);
 	PUB_INT("foo.bar", 1);
 	assert(new_msg_cb_touch == 2);
+	assert(non_empty_cb_touch == 1);
 	assert(ps_waiting(s1) == 2);
+	ps_flush(s1);
+	PUB_INT("foo.bar", 1);
+	assert(new_msg_cb_touch == 3);
+	assert(non_empty_cb_touch == 2);
 	ps_free_subscriber(s1);
 	check_leak();
 }
