@@ -1,5 +1,5 @@
 build:
-	gcc -g -O0 -Wall -Wextra -Wshadow -Wpedantic -fprofile-arcs -ftest-coverage tests.c ../src/*.c -I../src -lpthread -o tests.out
+	gcc -g -O0 -Wall -Wextra -Wshadow -Wpedantic -fprofile-arcs -ftest-coverage -DPS_DEPRECATE_NO_PREFIX tests.c ../src/*.c -I../src -lpthread -o tests.out
 
 test: clean build
 	./tests.out

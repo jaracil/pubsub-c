@@ -15,12 +15,12 @@ static void check_leak(void) {
 
 static void *inc_thread(void *v) {
 	(void) v; // unused
-	ps_subscriber_t *s = ps_new_subscriber(10, STRLIST("fun.inc"));
-	PUB_BOOL_FL("thread.ready", true, FL_STICKY);
+	ps_subscriber_t *s = ps_new_subscriber(10, PS_STRLIST("fun.inc"));
+	PS_PUB_BOOL_FL("thread.ready", true, PS_FL_STICKY);
 	ps_msg_t *msg = ps_get(s, 5000);
 	assert(msg != NULL);
-	assert(IS_INT(msg));
-	PUB_INT(msg->rtopic, msg->int_val + 1); // Response
+	assert(PS_IS_INT(msg));
+	PS_PUB_INT(msg->rtopic, msg->int_val + 1); // Response
 	ps_unref_msg(msg);
 	ps_free_subscriber(s);
 	return NULL;
@@ -51,7 +51,7 @@ void test_subscriptions(void) {
 	assert(ps_subscribe(s1, "foo.bar") == 0);
 	assert(ps_subscribe(s1, "foo.bar") == -1);
 	assert(ps_unsubscribe(s1, "foo.baz") == -1);
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo", "baz"));
 	assert(ps_unsubscribe(s1, "foo") == -1);
 	assert(ps_num_subs(s1) == 1);
 	assert(ps_num_subs(s2) == 2);
@@ -65,9 +65,9 @@ void test_subscriptions(void) {
 
 void test_hidden_subscription(void) {
 	printf("Test hidden subscription\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo.bar h"));
-	assert(PUB_NIL("foo.bar") == 1);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo.bar" PS_SUB_HIDDEN));
+	assert(PS_PUB_NIL("foo.bar") == 1);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 1);
 	ps_free_subscriber(s1);
@@ -80,23 +80,23 @@ void test_weird_subscription(void) {
 	ps_subscriber_t *su = ps_new_subscriber(10, NULL);
 
 	assert(ps_subscribe(su, "") == 0); // Test global suscription
-	assert(PUB_NIL("foo") == 1);
-	assert(PUB_NIL_FL("foo", FL_NONRECURSIVE) == 0);
+	assert(PS_PUB_NIL("foo") == 1);
+	assert(PS_PUB_NIL_FL("foo", PS_FL_NONRECURSIVE) == 0);
 	assert(ps_waiting(su) == 1);
 	ps_flush(su);
 	ps_subscribe(su, "bar 123!#"); // Test undefined flags
-	PUB_NIL("bar");
+	PS_PUB_NIL("bar");
 	assert(ps_waiting(su) == 2);
 	ps_flush(su);
 	ps_unsubscribe_all(su);
 
 	ps_subscribe(su, "baz p"); // Test malformed priority flag
-	PUB_NIL("baz");
+	PS_PUB_NIL("baz");
 	assert(ps_waiting(su) == 1);
 	ps_flush(su);
 
 	ps_subscribe(su, "baz pkk"); // Test priority flag with nondigit parameters
-	PUB_NIL("baz");
+	PS_PUB_NIL("baz");
 	assert(ps_waiting(su) == 1);
 	ps_flush(su);
 
@@ -112,8 +112,8 @@ void test_subs_count(void) {
 	assert(ps_subs_count("foo.bar") == 0);
 	assert(ps_subs_count("bar") == 0);
 	assert(ps_subs_count("baz") == 0);
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo", "baz"));
 	assert(ps_subs_count("foo") == 1);
 	assert(ps_subs_count("foo.bar") == 2);
 	assert(ps_subs_count("bar") == 0);
@@ -126,9 +126,9 @@ void test_subs_count(void) {
 void test_subscribe_many(void) {
 	printf("Test subscribe/unsubscribe many\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, NULL);
-	assert(ps_subscribe_many(s1, STRLIST("foo", "bar", "baz")) == 3);
+	assert(ps_subscribe_many(s1, PS_STRLIST("foo", "bar", "baz")) == 3);
 	assert(ps_num_subs(s1) == 3);
-	assert(ps_unsubscribe_many(s1, STRLIST("foo", "bar", "baz")) == 3);
+	assert(ps_unsubscribe_many(s1, PS_STRLIST("foo", "bar", "baz")) == 3);
 	assert(ps_num_subs(s1) == 0);
 	ps_free_subscriber(s1);
 	check_leak();
@@ -136,10 +136,10 @@ void test_subscribe_many(void) {
 
 void test_publish(void) {
 	printf("Test publish\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
-	PUB_BOOL("foo.bar", true);
-	PUB_BOOL("foo", true);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo", "baz"));
+	PS_PUB_BOOL("foo.bar", true);
+	PS_PUB_BOOL("foo", true);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 2);
 	assert(ps_stats_live_msg() == 2);
@@ -156,24 +156,24 @@ void test_publish(void) {
 
 void test_sticky(void) {
 	printf("Test sticky\n");
-	PUB_INT_FL("foo", 1, FL_STICKY);
-	PUB_INT_FL("foo", 2, FL_STICKY); // Last sticky override previous
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo"));
+	PS_PUB_INT_FL("foo", 1, PS_FL_STICKY);
+	PS_PUB_INT_FL("foo", 2, PS_FL_STICKY); // Last sticky override previous
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo"));
 	assert(ps_waiting(s1) == 1);
 	ps_msg_t *msg = ps_get(s1, -1);
 	assert(msg->int_val == 2);
 	ps_unref_msg(msg);
 	ps_free_subscriber(s1);
 	assert(ps_stats_live_msg() == 1); // The sticky message
-	PUB_INT("foo", 3);                // Publish normal message on the same path, unsticks previous sitcked message
+	PS_PUB_INT("foo", 3);             // Publish normal message on the same path, unsticks previous sitcked message
 	assert(ps_stats_live_msg() == 0);
 	check_leak();
 }
 
 void test_clean_sticky(void) {
 	printf("Test clean sticky\n");
-	PUB_INT_FL("foo.bar.baz", 1, FL_STICKY);
-	PUB_INT_FL("foo.fiz.fuz", 1, FL_STICKY);
+	PS_PUB_INT_FL("foo.bar.baz", 1, PS_FL_STICKY);
+	PS_PUB_INT_FL("foo.fiz.fuz", 1, PS_FL_STICKY);
 	assert(ps_stats_live_msg() == 2); // The sticky messages;
 	ps_clean_sticky("foo.bar");       // Remove sticky messages from "foo.bar" prefix
 	assert(ps_stats_live_msg() == 1); // The sticky messages;
@@ -184,8 +184,8 @@ void test_clean_sticky(void) {
 
 void test_clean_all_children_sticky(void) {
 	printf("Test clean all children sticky\n");
-	PUB_INT_FL("foo.bar.baz", 1, FL_STICKY);
-	PUB_INT_FL("foo.fiz.fuz", 1, FL_STICKY);
+	PS_PUB_INT_FL("foo.bar.baz", 1, PS_FL_STICKY);
+	PS_PUB_INT_FL("foo.fiz.fuz", 1, PS_FL_STICKY);
 	assert(ps_stats_live_msg() == 2); // The sticky messages;
 	ps_clean_sticky("foo");           // Remove sticky messages from "foo" prefix
 	assert(ps_stats_live_msg() == 0); // The sticky messages;
@@ -194,11 +194,11 @@ void test_clean_all_children_sticky(void) {
 
 void test_no_sticky_flag(void) {
 	printf("Test no sticky flag\n");
-	PUB_INT_FL("foo", 1, FL_STICKY);
+	PS_PUB_INT_FL("foo", 1, PS_FL_STICKY);
 	ps_subscriber_t *s1 =
-	ps_new_subscriber(10, STRLIST("foo s")); // Ignore sticky mesages published before subscription
+	ps_new_subscriber(10, PS_STRLIST("foo" PS_SUB_NOSTICKY)); // Ignore sticky mesages published before subscription
 	assert(ps_waiting(s1) == 0);
-	PUB_INT_FL("foo", 2, FL_STICKY); // This is a new message (published after subscription)
+	PS_PUB_INT_FL("foo", 2, PS_FL_STICKY); // This is a new message (published after subscription)
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
 	check_leak();
@@ -206,19 +206,19 @@ void test_no_sticky_flag(void) {
 
 void test_child_sticky_flag(void) {
 	printf("Test child sticky flag\n");
-	PUB_NIL_FL("foo.bar.baz", FL_STICKY);
-	PUB_NIL_FL("foo.bar", FL_STICKY);
-	PUB_NIL_FL("foo", FL_STICKY);
+	PS_PUB_NIL_FL("foo.bar.baz", PS_FL_STICKY);
+	PS_PUB_NIL_FL("foo.bar", PS_FL_STICKY);
+	PS_PUB_NIL_FL("foo", PS_FL_STICKY);
 
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo S")); // Get all child sticky messages
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo" PS_SUB_CHILDSTICKY)); // Get all child sticky messages
 	assert(ps_waiting(s1) == 3);
 	ps_free_subscriber(s1);
 
-	s1 = ps_new_subscriber(10, STRLIST("foo.bar S")); // Get all child sticky messages
+	s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar" PS_SUB_CHILDSTICKY)); // Get all child sticky messages
 	assert(ps_waiting(s1) == 2);
 	ps_free_subscriber(s1);
 
-	s1 = ps_new_subscriber(10, STRLIST("foo.bar.baz S")); // Get all child sticky messages
+	s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar.baz" PS_SUB_CHILDSTICKY)); // Get all child sticky messages
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
 
@@ -227,9 +227,9 @@ void test_child_sticky_flag(void) {
 
 void test_no_recursive(void) {
 	printf("Test no recursive\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo"));
-	PUB_INT_FL("foo.bar", 1, FL_NONRECURSIVE);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo"));
+	PS_PUB_INT_FL("foo.bar", 1, PS_FL_NONRECURSIVE);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 0);
 	ps_free_subscriber(s1);
@@ -240,18 +240,18 @@ void test_no_recursive(void) {
 void test_on_empty(void) {
 	ps_msg_t *msg;
 	printf("Test on empty\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo e"));
-	PUB_NIL("foo.bar");
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo" PS_SUB_EMPTY));
+	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
-	PUB_NIL("foo.bar");
+	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
 	msg = ps_get(s1, 10);
-	assert(IS_NIL(msg));
+	assert(PS_IS_NIL(msg));
 	ps_unref_msg(msg);
 	assert(ps_waiting(s1) == 0);
-	PUB_NIL("foo.bar");
+	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
-	PUB_NIL("foo.bar");
+	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
 	check_leak();
@@ -259,12 +259,12 @@ void test_on_empty(void) {
 
 void test_unsub_on_empty(void) {
 	printf("Test unsub on empty\n");
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo e", "bar e"));
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo" PS_SUB_EMPTY, "bar" PS_SUB_EMPTY));
 	ps_unsubscribe(s1, "foo");
-	PUB_NIL("foo.bar");
+	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 0);
-	ps_unsubscribe(s1, "bar e");
-	PUB_NIL("bar");
+	ps_unsubscribe(s1, "bar" PS_SUB_EMPTY);
+	PS_PUB_NIL("bar");
 	assert(ps_waiting(s1) == 0);
 	ps_free_subscriber(s1);
 	check_leak();
@@ -273,31 +273,31 @@ void test_unsub_on_empty(void) {
 void test_pub_get(void) {
 	printf("Test pub->get\n");
 	ps_msg_t *msg;
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	PUB_INT("foo.bar", 1);
-	PUB_DBL("foo.bar", 1.25);
-	PUB_STR("foo.bar", "Hello");
-	PUB_ERR("foo.bar", -1, "Bad result");
-	PUB_BUF("foo.bar", malloc(10), 10, free);
-	PUB_PTR("foo.bar", s1);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
+	PS_PUB_INT("foo.bar", 1);
+	PS_PUB_DBL("foo.bar", 1.25);
+	PS_PUB_STR("foo.bar", "Hello");
+	PS_PUB_ERR("foo.bar", -1, "Bad result");
+	PS_PUB_BUF("foo.bar", malloc(10), 10, free);
+	PS_PUB_PTR("foo.bar", s1);
 
 	msg = ps_get(s1, 10);
-	assert(IS_INT(msg) && msg->int_val == 1);
+	assert(PS_IS_INT(msg) && msg->int_val == 1);
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
-	assert(IS_DBL(msg) && msg->dbl_val == 1.25);
+	assert(PS_IS_DBL(msg) && msg->dbl_val == 1.25);
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
-	assert(IS_STR(msg) && strcmp(msg->str_val, "Hello") == 0);
+	assert(PS_IS_STR(msg) && strcmp(msg->str_val, "Hello") == 0);
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
-	assert(IS_ERR(msg) && (msg->err_val.id == -1) && (strcmp(msg->err_val.desc, "Bad result") == 0));
+	assert(PS_IS_ERR(msg) && (msg->err_val.id == -1) && (strcmp(msg->err_val.desc, "Bad result") == 0));
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
-	assert(IS_BUF(msg) && (msg->buf_val.sz == 10));
+	assert(PS_IS_BUF(msg) && (msg->buf_val.sz == 10));
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
-	assert(IS_PTR(msg) && (msg->ptr_val == s1));
+	assert(PS_IS_PTR(msg) && (msg->ptr_val == s1));
 	ps_unref_msg(msg);
 
 	msg = ps_get(s1, 1);
@@ -311,17 +311,17 @@ void test_pub_get(void) {
 void test_overflow(void) {
 	printf("Test overflow\n");
 	ps_msg_t *msg;
-	ps_subscriber_t *s1 = ps_new_subscriber(2, STRLIST("foo.bar"));
-	PUB_INT("foo.bar", 1);
-	PUB_INT("foo.bar", 2);
-	PUB_INT("foo.bar", 3);
+	ps_subscriber_t *s1 = ps_new_subscriber(2, PS_STRLIST("foo.bar"));
+	PS_PUB_INT("foo.bar", 1);
+	PS_PUB_INT("foo.bar", 2);
+	PS_PUB_INT("foo.bar", 3);
 	assert(ps_overflow(s1) == 1);
 	assert(ps_overflow(s1) == 0);
 	msg = ps_get(s1, 10);
-	assert(IS_INT(msg) && msg->int_val == 1);
+	assert(PS_IS_INT(msg) && msg->int_val == 1);
 	ps_unref_msg(msg);
 	msg = ps_get(s1, 10);
-	assert(IS_INT(msg) && msg->int_val == 2);
+	assert(PS_IS_INT(msg) && msg->int_val == 2);
 	ps_unref_msg(msg);
 
 	assert(ps_waiting(s1) == 0);
@@ -337,21 +337,21 @@ void test_new_msg_cb(void) {
 	non_empty_cb_touch = 0;
 	non_empty_cb_subscriber = NULL;
 
-	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
-	PUB_INT("foo.bar", 1);
+	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
+	PS_PUB_INT("foo.bar", 1);
 	ps_set_new_msg_cb(s1, new_msg_cb);
 	assert(new_msg_cb_touch == 1);
 	assert(new_msg_cb_subscriber == s1);
-	PUB_INT("foo.bar", 1);
+	PS_PUB_INT("foo.bar", 1);
 	ps_set_non_empty_cb(s1, non_empty_cb);
 	assert(non_empty_cb_touch == 1);
 	assert(non_empty_cb_subscriber == s1);
-	PUB_INT("foo.bar", 1);
+	PS_PUB_INT("foo.bar", 1);
 	assert(non_empty_cb_touch == 1);
 	assert(new_msg_cb_touch == 3);
 	assert(ps_waiting(s1) == 3);
 	ps_flush(s1);
-	PUB_INT("foo.bar", 1);
+	PS_PUB_INT("foo.bar", 1);
 	assert(new_msg_cb_touch == 4);
 	assert(non_empty_cb_touch == 2);
 	ps_free_subscriber(s1);
@@ -366,11 +366,11 @@ void test_call(void) {
 	msg = ps_wait_one("thread.ready", 5000);
 	assert(msg != NULL && msg->bool_val == true);
 	ps_unref_msg(msg);
-	msg = CALL_INT("fun.inc", 25, 1000);
+	msg = PS_CALL_INT("fun.inc", 25, 1000);
 	assert(msg != NULL && msg->int_val == 26);
 	ps_unref_msg(msg);
 
-	msg = CALL_INT("fun.other", 0, 1000000); // If message is not delivered timeout is triggered
+	msg = PS_CALL_INT("fun.other", 0, 1000000); // If message is not delivered timeout is triggered
 	assert(msg == NULL);
 	ps_unref_msg(msg); // unref_msg suppots NULL messages
 
@@ -386,7 +386,7 @@ void test_no_return_path(void) {
 	msg = ps_wait_one("thread.ready", 5000);
 	assert(msg != NULL && msg->bool_val == true);
 	ps_unref_msg(msg);
-	PUB_INT("fun.inc", 25);
+	PS_PUB_INT("fun.inc", 25);
 	pthread_join(thread, NULL);
 	check_leak();
 }
@@ -398,8 +398,8 @@ void test_topic_prefix_suffix(void) {
 	assert(!ps_has_topic_prefix(msg, "foo.bar"));
 	assert(!ps_has_topic_suffix(msg, "foo.bar"));
 
-	ps_subscriber_t *s1 = ps_new_subscriber(2, STRLIST("foo.bar"));
-	PUB_NIL("foo.bar");
+	ps_subscriber_t *s1 = ps_new_subscriber(2, PS_STRLIST("foo.bar"));
+	PS_PUB_NIL("foo.bar");
 	msg = ps_get(s1, 10);
 	assert(ps_has_topic(msg, "foo.bar"));
 	assert(ps_has_topic_prefix(msg, "foo."));
@@ -425,31 +425,31 @@ void test_topic_prefix_suffix(void) {
 
 void test_msg_getset(void) {
 	printf("Test msg getset values\n");
-	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST("foo"));
+	ps_subscriber_t *su = ps_new_subscriber(1, PS_STRLIST("foo"));
 	ps_msg_t *msg = NULL;
 
-	PUB_INT("foo", 42);
+	PS_PUB_INT("foo", 42);
 	msg = ps_get(su, 1000);
 	assert(ps_msg_value_int(msg) == 42);
 	assert(ps_msg_value_double(msg) == 42);
 	assert(ps_msg_value_bool(msg));
 	ps_unref_msg(msg);
 
-	PUB_DBL("foo", 123);
+	PS_PUB_DBL("foo", 123);
 	msg = ps_get(su, 1000);
 	assert(ps_msg_value_int(msg) == 123);
 	assert(ps_msg_value_double(msg) == 123);
 	assert(ps_msg_value_bool(msg));
 	ps_unref_msg(msg);
 
-	PUB_BOOL("foo", true);
+	PS_PUB_BOOL("foo", true);
 	msg = ps_get(su, 1000);
 	assert(ps_msg_value_int(msg) == 1);
 	assert(ps_msg_value_double(msg) == 1);
 	assert(ps_msg_value_bool(msg));
 	ps_unref_msg(msg);
 
-	PUB_NIL("foo");
+	PS_PUB_NIL("foo");
 	msg = ps_get(su, 1000);
 	assert(ps_msg_value_int(msg) == 0);
 	assert(ps_msg_value_double(msg) == 0);
@@ -469,7 +469,7 @@ void test_dup_msg(void) {
 	ps_msg_t *dup = NULL;
 
 	char str[] = "bar";
-	msg = ps_new_msg("foo", STR_TYP, str);
+	msg = ps_new_msg("foo", PS_STR_TYP, str);
 	ps_msg_set_rtopic(msg, "baz");
 	int live_msg = ps_stats_live_msg();
 	dup = ps_dup_msg(msg);
@@ -486,7 +486,7 @@ void test_dup_msg(void) {
 
 	uint8_t *buf = calloc(3, sizeof(uint8_t));
 	buf[0] = 0x42;
-	msg = ps_new_msg("foo", BUF_TYP, (void *) buf, 3, free);
+	msg = ps_new_msg("foo", PS_BUF_TYP, (void *) buf, 3, free);
 	ps_msg_set_rtopic(msg, "baz");
 	dup = ps_dup_msg(msg);
 	assert(dup->buf_val.ptr != msg->buf_val.ptr);
@@ -497,7 +497,7 @@ void test_dup_msg(void) {
 	ps_unref_msg(dup);
 
 	char err[] = "error";
-	msg = ps_new_msg("foo", ERR_TYP, 42, err);
+	msg = ps_new_msg("foo", PS_ERR_TYP, 42, err);
 	ps_msg_set_rtopic(msg, "baz");
 	dup = ps_dup_msg(msg);
 	assert(dup->err_val.desc != msg->err_val.desc);
@@ -511,7 +511,7 @@ void test_dup_msg(void) {
 void test_subscriber_userdata(void) {
 	printf("Test userdata\n");
 	int foo = 42;
-	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST("foo"));
+	ps_subscriber_t *su = ps_new_subscriber(1, PS_STRLIST("foo"));
 	ps_subscriber_user_data_set(su, &foo);
 	assert(ps_subscriber_user_data(su) == &foo);
 	ps_free_subscriber(su);
@@ -526,11 +526,11 @@ void test_priority(void) {
 	return;
 #endif
 
-	ps_subscriber_t *su = ps_new_subscriber(3, STRLIST("lost", "foo", "bar p1", "baz p9"));
-	PUB_NIL("foo");
-	PUB_NIL("lost");
-	PUB_NIL("baz");
-	PUB_NIL("bar");
+	ps_subscriber_t *su = ps_new_subscriber(3, PS_STRLIST("lost", "foo", "bar" PS_SUB_PRIO(1), "baz" PS_SUB_PRIO(9)));
+	PS_PUB_NIL("foo");
+	PS_PUB_NIL("lost");
+	PS_PUB_NIL("baz");
+	PS_PUB_NIL("bar");
 
 	assert(ps_overflow(su) == 1);
 
@@ -549,12 +549,34 @@ void test_priority(void) {
 
 	assert(ps_waiting(su) == 0);
 
-	PUB_NIL("foo");
-	PUB_NIL("baz");
-	PUB_NIL("bar");
+	PS_PUB_NIL("foo");
+	PS_PUB_NIL("baz");
+	PS_PUB_NIL("bar");
 
 	ps_free_subscriber(su);
 	check_leak();
+}
+
+void test_compatibility(void) {
+#ifndef PS_DEPRECATE_NO_PREFIX
+	printf("Test compatibility\n");
+	ps_subscriber_t *s1 = ps_new_subscriber(10, STRLIST("foo.bar"));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, STRLIST("foo", "baz"));
+	PUB_INT("foo.bar", true);
+	PUB_BOOL("foo", true);
+	assert(ps_waiting(s1) == 1);
+	assert(ps_waiting(s2) == 2);
+
+	new_msg_cb_touch = 0;
+	new_msg_cb_subscriber = NULL;
+	ps_set_new_msg_cb(s1, new_msg_cb);
+	assert(new_msg_cb_touch == 1);
+	assert(new_msg_cb_subscriber == s1);
+
+	ps_free_subscriber(s1);
+	ps_free_subscriber(s2);
+	check_leak();
+#endif
 }
 
 void run_all(void) {
@@ -582,6 +604,7 @@ void run_all(void) {
 	test_dup_msg();
 	test_subscriber_userdata();
 	test_priority();
+	test_compatibility();
 	printf("All tests passed!\n");
 }
 

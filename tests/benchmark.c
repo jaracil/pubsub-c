@@ -26,10 +26,10 @@ uint64_t timespec_to_ns(struct timespec t) {
 void test1(void) {
 	ps_subscriber_t *su = NULL;
 
-	su = ps_new_subscriber(ITERATIONS, STRLIST("topic.a"));
-	BENCH("publish without sub", ITERATIONS, { PUB_INT("topic.b", 5); });
-	BENCH("publish without overflow", ITERATIONS, { PUB_INT("topic.a", 5); });
-	BENCH("publish with overflow", ITERATIONS, { PUB_INT("topic.a", 5); });
+	su = ps_new_subscriber(ITERATIONS, PS_STRLIST("topic.a"));
+	BENCH("publish without sub", ITERATIONS, { PS_PUB_INT("topic.b", 5); });
+	BENCH("publish without overflow", ITERATIONS, { PS_PUB_INT("topic.a", 5); });
+	BENCH("publish with overflow", ITERATIONS, { PS_PUB_INT("topic.a", 5); });
 	BENCH("ps_get and ps_unref_msg", ITERATIONS, { ps_unref_msg(ps_get(su, 1000)); });
 	// BENCH("ps_get and wait 1s", 1, { ps_unref_msg(ps_get(su, 1000)); });
 
@@ -39,13 +39,13 @@ void test1(void) {
 void test2(void) {
 	ps_subscriber_t *su = NULL;
 
-	su = ps_new_subscriber(ITERATIONS, STRLIST("topic.a"));
+	su = ps_new_subscriber(ITERATIONS, PS_STRLIST("topic.a"));
 	char t[128] = {0};
 	for (int i = 0; i < 1000; i++) {
 		snprintf(t, 128, "t%d", i);
 		ps_subscribe(su, t);
 	}
-	BENCH("publish nonsubbed topic (1 sub 1000 topics)", ITERATIONS, { PUB_INT("topic.b", 5); });
+	BENCH("publish nonsubbed topic (1 sub 1000 topics)", ITERATIONS, { PS_PUB_INT("topic.b", 5); });
 
 	ps_free_subscriber(su);
 }
@@ -54,12 +54,12 @@ void test3(size_t n) {
 	ps_subscriber_t **su = calloc(n, sizeof(ps_subscriber_t *));
 
 	for (size_t i = 0; i < n; i++) {
-		su[i] = ps_new_subscriber(100, STRLIST("topic.a"));
+		su[i] = ps_new_subscriber(100, PS_STRLIST("topic.a"));
 	}
 
 	char t[128] = {0};
 	snprintf(t, 128, "publish nonsubbed topic (%ld subs 1 topic) ", n);
-	BENCH(t, 100, { PUB_INT("topic.b", 5); });
+	BENCH(t, 100, { PS_PUB_INT("topic.b", 5); });
 
 	for (int i = 0; i < n; i++) {
 		ps_free_subscriber(su[i]);
@@ -70,12 +70,12 @@ void test4(size_t n) {
 	ps_subscriber_t **su = calloc(n, sizeof(ps_subscriber_t *));
 
 	for (size_t i = 0; i < n; i++) {
-		su[i] = ps_new_subscriber(100, STRLIST("topic.a"));
+		su[i] = ps_new_subscriber(100, PS_STRLIST("topic.a"));
 	}
 
 	char t[128] = {0};
 	snprintf(t, 128, "publish subbed topic (%ld subs 1 topic)", n);
-	BENCH(t, 100, { PUB_INT("topic.a", 5); });
+	BENCH(t, 100, { PS_PUB_INT("topic.a", 5); });
 
 	for (int i = 0; i < n; i++) {
 		ps_free_subscriber(su[i]);

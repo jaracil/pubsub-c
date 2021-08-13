@@ -38,8 +38,8 @@ struct ps_subscriber_s {
 	ps_queue_t *q;
 	subscriptions_list_t *subs;
 	uint32_t overflow;
-	new_msg_cb_t new_msg_cb;
-	non_empty_cb_t non_empty_cb;
+	ps_new_msg_cb_t new_msg_cb;
+	ps_non_empty_cb_t non_empty_cb;
 	void *userData;
 };
 
@@ -64,38 +64,38 @@ void ps_deinit(void) {
 }
 
 static void ps_msg_free_value(ps_msg_t *msg) {
-	if (IS_STR(msg)) {
+	if (PS_IS_STR(msg)) {
 		free(msg->str_val);
-	} else if (IS_BUF(msg)) {
+	} else if (PS_IS_BUF(msg)) {
 		if (msg->buf_val.ptr && msg->buf_val.dtor) {
 			msg->buf_val.dtor(msg->buf_val.ptr);
 		}
-	} else if (IS_ERR(msg)) {
+	} else if (PS_IS_ERR(msg)) {
 		free(msg->err_val.desc);
 	}
 
-	msg->flags = (msg->flags & ~MSK_VALUE) | NIL_TYP;
+	msg->flags = (msg->flags & ~PS_MSK_VALUE) | PS_NIL_TYP;
 }
 
 static void ps_msg_set_vvalue(ps_msg_t *msg, uint32_t flags, va_list args) {
 	ps_msg_free_value(msg);
 
-	msg->flags = (msg->flags & ~MSK_VALUE) | (flags & MSK_VALUE);
-	if (IS_INT(msg)) {
+	msg->flags = (msg->flags & ~PS_MSK_VALUE) | (flags & PS_MSK_VALUE);
+	if (PS_IS_INT(msg)) {
 		msg->int_val = (va_arg(args, int64_t));
-	} else if (IS_DBL(msg)) {
+	} else if (PS_IS_DBL(msg)) {
 		msg->dbl_val = (va_arg(args, double));
-	} else if (IS_PTR(msg)) {
+	} else if (PS_IS_PTR(msg)) {
 		msg->ptr_val = (va_arg(args, void *));
-	} else if (IS_STR(msg)) {
+	} else if (PS_IS_STR(msg)) {
 		msg->str_val = strdup((va_arg(args, char *)));
-	} else if (IS_BOOL(msg)) {
+	} else if (PS_IS_BOOL(msg)) {
 		msg->bool_val = (va_arg(args, int));
-	} else if (IS_BUF(msg)) {
+	} else if (PS_IS_BUF(msg)) {
 		msg->buf_val.ptr = (va_arg(args, void *));
 		msg->buf_val.sz = (va_arg(args, size_t));
 		msg->buf_val.dtor = (va_arg(args, ps_dtor_t));
-	} else if (IS_ERR(msg)) {
+	} else if (PS_IS_ERR(msg)) {
 		msg->err_val.id = (va_arg(args, int));
 		msg->err_val.desc = strdup((va_arg(args, char *)));
 	}
@@ -137,15 +137,15 @@ ps_msg_t *ps_dup_msg(ps_msg_t const *msg_orig) {
 		msg->rtopic = strdup(msg_orig->rtopic);
 	}
 
-	if (IS_STR(msg_orig)) {
+	if (PS_IS_STR(msg_orig)) {
 		if (msg_orig->str_val != NULL) {
 			msg->str_val = strdup(msg_orig->str_val);
 		}
-	} else if (IS_BUF(msg_orig)) {
+	} else if (PS_IS_BUF(msg_orig)) {
 		msg->buf_val.ptr = malloc(msg_orig->buf_val.sz);
 		memcpy(msg->buf_val.ptr, msg_orig->buf_val.ptr, msg_orig->buf_val.sz);
 		msg->buf_val.dtor = free;
-	} else if (IS_ERR(msg_orig)) {
+	} else if (PS_IS_ERR(msg_orig)) {
 		if (msg_orig->err_val.desc != NULL) {
 			msg->err_val.desc = strdup(msg_orig->err_val.desc);
 		}
@@ -184,31 +184,31 @@ void ps_msg_set_value(ps_msg_t *msg, uint32_t flags, ...) {
 }
 
 int64_t ps_msg_value_int(const ps_msg_t *msg) {
-	if (IS_INT(msg))
+	if (PS_IS_INT(msg))
 		return msg->int_val;
-	else if (IS_DBL(msg))
+	else if (PS_IS_DBL(msg))
 		return msg->dbl_val;
-	else if (IS_BOOL(msg))
+	else if (PS_IS_BOOL(msg))
 		return msg->bool_val;
 	return 0;
 }
 
 double ps_msg_value_double(const ps_msg_t *msg) {
-	if (IS_INT(msg))
+	if (PS_IS_INT(msg))
 		return msg->int_val;
-	else if (IS_DBL(msg))
+	else if (PS_IS_DBL(msg))
 		return msg->dbl_val;
-	else if (IS_BOOL(msg))
+	else if (PS_IS_BOOL(msg))
 		return msg->bool_val;
 	return 0;
 }
 
 bool ps_msg_value_bool(const ps_msg_t *msg) {
-	if (IS_INT(msg))
+	if (PS_IS_INT(msg))
 		return msg->int_val != 0;
-	else if (IS_DBL(msg))
+	else if (PS_IS_DBL(msg))
 		return msg->dbl_val != 0.0;
-	else if (IS_BOOL(msg))
+	else if (PS_IS_BOOL(msg))
 		return msg->bool_val;
 	return false;
 }
@@ -306,7 +306,7 @@ static void push_child_sticky(ps_subscriber_t *su, const char *prefix, uint8_t p
 	}
 }
 
-ps_subscriber_t *ps_new_subscriber(size_t queue_size, const strlist_t subs) {
+ps_subscriber_t *ps_new_subscriber(size_t queue_size, const ps_strlist_t subs) {
 	ps_subscriber_t *su = calloc(1, sizeof(ps_subscriber_t));
 	su->q = ps_new_queue(queue_size);
 	su->overflow = false;
@@ -330,7 +330,7 @@ void *ps_subscriber_user_data(ps_subscriber_t *s) {
 	return s->userData;
 }
 
-void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
+void ps_set_new_msg_cb(ps_subscriber_t *su, ps_new_msg_cb_t cb) {
 	GLOBAL_LOCK
 	su->new_msg_cb = cb;
 	if (ps_queue_waiting(su->q) > 0) {
@@ -341,7 +341,7 @@ void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
 	GLOBAL_UNLOCK
 }
 
-void ps_set_non_empty_cb(ps_subscriber_t *su, non_empty_cb_t cb) {
+void ps_set_non_empty_cb(ps_subscriber_t *su, ps_non_empty_cb_t cb) {
 	GLOBAL_LOCK
 	su->non_empty_cb = cb;
 	if (ps_queue_waiting(su->q) > 0) {
@@ -366,7 +366,7 @@ int ps_flush(ps_subscriber_t *su) {
 	return flushed;
 }
 
-int ps_subscribe_many(ps_subscriber_t *su, const strlist_t subs) {
+int ps_subscribe_many(ps_subscriber_t *su, const ps_strlist_t subs) {
 	int n = 0;
 	if (subs != NULL) {
 		size_t idx = 0;
@@ -490,7 +490,7 @@ exit_fn:
 	return ret;
 }
 
-int ps_unsubscribe_many(ps_subscriber_t *su, const strlist_t subs) {
+int ps_unsubscribe_many(ps_subscriber_t *su, const ps_strlist_t subs) {
 	int n = 0;
 	if (subs != NULL) {
 		size_t idx = 0;
@@ -577,7 +577,7 @@ int ps_publish(ps_msg_t *msg) {
 		tm = fetch_topic(topic);
 		if (first) {
 			first = false;
-			if (msg->flags & FL_STICKY) {
+			if (msg->flags & PS_FL_STICKY) {
 				if (tm == NULL) {
 					tm = create_topic(topic);
 				}
@@ -605,7 +605,7 @@ int ps_publish(ps_msg_t *msg) {
 				}
 			}
 		}
-		if (msg->flags & FL_NONRECURSIVE)
+		if (msg->flags & PS_FL_NONRECURSIVE)
 			break;
 
 		if (topic[0] == '\0') {
@@ -664,7 +664,7 @@ ps_msg_t *ps_call(ps_msg_t *msg, int64_t timeout) {
 
 	snprintf(rtopic, sizeof(rtopic), "$r.%u", __sync_add_and_fetch(&uuid_ctr, 1));
 	ps_msg_set_rtopic(msg, rtopic);
-	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST(rtopic));
+	ps_subscriber_t *su = ps_new_subscriber(1, PS_STRLIST(rtopic));
 	if (ps_publish(msg) == 0) {
 		goto exit_fn;
 	}
@@ -677,7 +677,7 @@ exit_fn:
 ps_msg_t *ps_wait_one(const char *topic, int64_t timeout) {
 	ps_msg_t *ret_msg = NULL;
 
-	ps_subscriber_t *su = ps_new_subscriber(1, STRLIST(topic));
+	ps_subscriber_t *su = ps_new_subscriber(1, PS_STRLIST(topic));
 	ret_msg = ps_get(su, timeout);
 	ps_free_subscriber(su);
 	return ret_msg;
