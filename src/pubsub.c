@@ -344,7 +344,7 @@ void ps_set_new_msg_cb(ps_subscriber_t *su, new_msg_cb_t cb) {
 void ps_set_non_empty_cb(ps_subscriber_t *su, non_empty_cb_t cb) {
 	GLOBAL_LOCK
 	su->non_empty_cb = cb;
-	if (ps_queue_waiting(su->q) == 1) {
+	if (ps_queue_waiting(su->q) > 0) {
 		if (su->non_empty_cb != NULL) {
 			(su->non_empty_cb)(su);
 		}
