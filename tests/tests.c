@@ -115,6 +115,7 @@ void test_subs_count(void) {
 	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
 	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo", "baz"));
 	assert(ps_subs_count("foo") == 1);
+	assert(ps_subs_count("foo" PS_SUB_PRIO(5)) == 1);
 	assert(ps_subs_count("foo.bar") == 2);
 	assert(ps_subs_count("bar") == 0);
 	assert(ps_subs_count("baz") == 1);
@@ -402,6 +403,9 @@ void test_topic_prefix_suffix(void) {
 	PS_PUB_NIL("foo.bar");
 	msg = ps_get(s1, 10);
 	assert(ps_has_topic(msg, "foo.bar"));
+	assert(ps_has_topic(msg, "foo.bar" PS_SUB_PRIO(5)));
+	assert(ps_has_topic_prefix(msg, "foo.bar"));
+	assert(ps_has_topic_prefix(msg, "foo.bar" PS_SUB_PRIO(5)));
 	assert(ps_has_topic_prefix(msg, "foo."));
 	assert(ps_has_topic_suffix(msg, ".bar"));
 
@@ -527,7 +531,7 @@ void test_priority(void) {
 #endif
 
 	ps_subscriber_t *su = ps_new_subscriber(3, PS_STRLIST("lost", "foo", "bar" PS_SUB_PRIO(1), "baz" PS_SUB_PRIO(9)));
-	PS_PUB_NIL("foo");
+	PS_PUB_NIL("foo" PS_SUB_PRIO(1)); // priorities on publishes should be ignored
 	PS_PUB_NIL("lost");
 	PS_PUB_NIL("baz");
 	PS_PUB_NIL("bar");

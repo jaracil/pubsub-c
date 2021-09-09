@@ -571,6 +571,11 @@ int ps_publish(ps_msg_t *msg) {
 	subscriber_list_t *sl = NULL;
 	size_t ret = 0;
 	char *topic = strdup(msg->topic);
+
+	char *fl_str = strchr(topic, ' ');
+	if (fl_str != NULL)
+		*fl_str = '\0';
+
 	GLOBAL_LOCK
 	bool first = true;
 	for (;;) {
@@ -631,6 +636,10 @@ int ps_subs_count(char *topic_) {
 		return 0;
 	char *topic = strdup(topic_);
 
+	char *fl_str = strchr(topic, ' ');
+	if (fl_str != NULL)
+		*fl_str = '\0';
+
 	topic_map_t *tm = NULL;
 	subscriber_list_t *sl = NULL;
 	size_t count = 0;
@@ -687,23 +696,35 @@ bool ps_has_topic_prefix(ps_msg_t *msg, const char *pre) {
 	if (msg == NULL) {
 		return false;
 	}
-	return strncmp(pre, msg->topic, strlen(pre)) == 0;
+
+	// compare with strlen(pre) or length until flags
+	char *fl_str = strchr(pre, ' ');
+	size_t len = fl_str == NULL ? strlen(pre) : (size_t) (fl_str - pre);
+
+	return strncmp(pre, msg->topic, len) == 0;
 }
 
 bool ps_has_topic_suffix(ps_msg_t *msg, const char *suf) {
 	if (msg == NULL) {
 		return false;
 	}
-	size_t lsuf = strlen(suf), ltopic = strlen(msg->topic);
-	if (lsuf <= ltopic) {
-		return strcmp(suf, &msg->topic[ltopic - lsuf]) == 0;
+	size_t lsuf = strlen(suf);
+	size_t ltopic = strlen(msg->topic);
+	if (lsuf > ltopic) {
+		return false;
 	}
-	return false;
+
+	return strcmp(suf, &msg->topic[ltopic - lsuf]) == 0;
 }
 
 bool ps_has_topic(ps_msg_t *msg, const char *topic) {
 	if (msg == NULL) {
 		return false;
 	}
-	return strcmp(topic, msg->topic) == 0;
+
+	// compare with strlen(pre) or length until flags
+	char *fl_str = strchr(topic, ' ');
+	size_t len = fl_str == NULL ? strlen(topic) : (size_t) (fl_str - topic);
+
+	return strncmp(topic, msg->topic, len) == 0;
 }
