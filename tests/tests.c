@@ -67,11 +67,15 @@ void test_hidden_subscription(void) {
 	printf("Test hidden subscription\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar"));
 	ps_subscriber_t *s2 = ps_new_subscriber(10, PS_STRLIST("foo.bar" PS_SUB_HIDDEN));
+	ps_subscriber_t *s3 = ps_new_subscriber(10, NULL);
+	ps_subscribe_flags(s3, "foo.bar", &(ps_sub_flags_t){.hidden = true});
 	assert(PS_PUB_NIL("foo.bar") == 1);
 	assert(ps_waiting(s1) == 1);
 	assert(ps_waiting(s2) == 1);
+	assert(ps_waiting(s3) == 1);
 	ps_free_subscriber(s1);
 	ps_free_subscriber(s2);
+	ps_free_subscriber(s3);
 	check_leak();
 }
 
@@ -196,8 +200,10 @@ void test_clean_all_children_sticky(void) {
 void test_no_sticky_flag(void) {
 	printf("Test no sticky flag\n");
 	PS_PUB_INT_FL("foo", 1, PS_FL_STICKY);
+	PS_PUB_INT_FL("bar", 1, PS_FL_STICKY);
 	ps_subscriber_t *s1 =
 	ps_new_subscriber(10, PS_STRLIST("foo" PS_SUB_NOSTICKY)); // Ignore sticky mesages published before subscription
+	ps_subscribe_flags(s1, "bar", &(ps_sub_flags_t){.no_sticky = true});
 	assert(ps_waiting(s1) == 0);
 	PS_PUB_INT_FL("foo", 2, PS_FL_STICKY); // This is a new message (published after subscription)
 	assert(ps_waiting(s1) == 1);
@@ -215,7 +221,8 @@ void test_child_sticky_flag(void) {
 	assert(ps_waiting(s1) == 3);
 	ps_free_subscriber(s1);
 
-	s1 = ps_new_subscriber(10, PS_STRLIST("foo.bar" PS_SUB_CHILDSTICKY)); // Get all child sticky messages
+	s1 = ps_new_subscriber(10, NULL); // Get all child sticky messages
+	ps_subscribe_flags(s1, "foo.bar", &(ps_sub_flags_t){.child_sticky = true});
 	assert(ps_waiting(s1) == 2);
 	ps_free_subscriber(s1);
 
@@ -242,10 +249,14 @@ void test_on_empty(void) {
 	ps_msg_t *msg;
 	printf("Test on empty\n");
 	ps_subscriber_t *s1 = ps_new_subscriber(10, PS_STRLIST("foo" PS_SUB_EMPTY));
+	ps_subscriber_t *s2 = ps_new_subscriber(10, NULL);
+	ps_subscribe_flags(s2, "foo", &(ps_sub_flags_t){.on_empty = true});
 	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
+	assert(ps_waiting(s2) == 1);
 	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
+	assert(ps_waiting(s2) == 1);
 	msg = ps_get(s1, 10);
 	assert(PS_IS_NIL(msg));
 	ps_unref_msg(msg);
@@ -255,6 +266,7 @@ void test_on_empty(void) {
 	PS_PUB_NIL("foo.bar");
 	assert(ps_waiting(s1) == 1);
 	ps_free_subscriber(s1);
+	ps_free_subscriber(s2);
 	check_leak();
 }
 
@@ -530,7 +542,8 @@ void test_priority(void) {
 	return;
 #endif
 
-	ps_subscriber_t *su = ps_new_subscriber(3, PS_STRLIST("lost", "foo", "bar" PS_SUB_PRIO(1), "baz" PS_SUB_PRIO(9)));
+	ps_subscriber_t *su = ps_new_subscriber(3, PS_STRLIST("lost", "foo", "bar" PS_SUB_PRIO(1)));
+	ps_subscribe_flags(su, "baz", &(ps_sub_flags_t){.priority = 9});
 	PS_PUB_NIL("foo" PS_SUB_PRIO(1)); // priorities on publishes should be ignored
 	PS_PUB_NIL("lost");
 	PS_PUB_NIL("baz");

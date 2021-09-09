@@ -379,6 +379,10 @@ int ps_subscribe_many(ps_subscriber_t *su, const ps_strlist_t subs) {
 }
 
 int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
+	return ps_subscribe_flags(su, topic_orig, NULL);
+}
+
+int ps_subscribe_flags(ps_subscriber_t *su, const char *topic_orig, ps_sub_flags_t *flags) {
 	int ret = 0;
 	topic_map_t *tm;
 	subscriber_list_t *sl;
@@ -386,11 +390,14 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 
 	char *topic = strdup(topic_orig);
 
-	bool hidden_flag = false;
-	bool on_empty_flag = false;
-	bool no_sticky_flag = false;
-	bool child_sticky_flag = false;
-	uint8_t priority = 0;
+	if (flags == NULL)
+		flags = &(ps_sub_flags_t){0};
+
+	bool hidden_flag = flags->hidden;
+	bool on_empty_flag = flags->on_empty;
+	bool no_sticky_flag = flags->no_sticky;
+	bool child_sticky_flag = flags->child_sticky;
+	uint8_t priority = flags->priority;
 
 	char *fl_str = strchr(topic, ' ');
 	if (fl_str != NULL) {

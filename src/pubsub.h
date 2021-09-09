@@ -100,6 +100,14 @@ typedef struct ps_msg_s {
 	};
 } ps_msg_t;
 
+typedef struct ps_sub_flags_s {
+	bool hidden;
+	bool on_empty;
+	bool no_sticky;
+	bool child_sticky;
+	uint8_t priority;
+} ps_sub_flags_t;
+
 typedef struct ps_subscriber_s ps_subscriber_t; // Private definition
 
 typedef void (*ps_new_msg_cb_t)(ps_subscriber_t *);
@@ -311,6 +319,17 @@ ps_msg_t *ps_get(ps_subscriber_t *su, int64_t timeout);
  *   * "foo.bar S": Receive stickied messages from the child topics
  */
 int ps_subscribe(ps_subscriber_t *su, const char *topic);
+
+/**
+ * @brief ps_subscribe_flags adds topic to the subscriber instance
+ * @param su subscriber instance
+ * @param topic string path of topic to subscribe
+ * @param flags struct with the desired flags
+ * @return status (-1 = Error, 0 = Ok)
+ *
+ * The flags set in the parameter would be overwritten by any topic-defined flag
+ */
+int ps_subscribe_flags(ps_subscriber_t *su, const char *topic_orig, ps_sub_flags_t *flags);
 
 /**
  * @brief ps_subscribe_many adds several topics to the subscriber instance
