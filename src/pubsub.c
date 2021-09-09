@@ -382,7 +382,7 @@ int ps_subscribe(ps_subscriber_t *su, const char *topic_orig) {
 	return ps_subscribe_flags(su, topic_orig, NULL);
 }
 
-int ps_subscribe_flags(ps_subscriber_t *su, const char *topic_orig, ps_sub_flags_t *flags) {
+int ps_subscribe_flags(ps_subscriber_t *su, const char *topic_orig, ps_sub_flags_t *pflags) {
 	int ret = 0;
 	topic_map_t *tm;
 	subscriber_list_t *sl;
@@ -390,8 +390,10 @@ int ps_subscribe_flags(ps_subscriber_t *su, const char *topic_orig, ps_sub_flags
 
 	char *topic = strdup(topic_orig);
 
-	if (flags == NULL)
-		flags = &(ps_sub_flags_t){0};
+	ps_sub_flags_t *flags = &(ps_sub_flags_t){.hidden = false};
+	if (pflags != NULL) {
+		flags = pflags;
+	}
 
 	bool hidden_flag = flags->hidden;
 	bool on_empty_flag = flags->on_empty;
